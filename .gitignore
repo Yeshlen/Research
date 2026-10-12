@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+.DS_Store
+# generated data is reproducible from the seed; keep it out of git
+data/synthetic/*.csv
+data/synthetic/*.parquet
+sketch_output.csv
+# LaTeX build artefacts
+report/*.aux
+report/*.log
+report/*.bbl
+report/*.blg
+report/*.out
+report/*.toc
+report/*.synctex.gz
