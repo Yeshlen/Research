@@ -23,11 +23,21 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Generate the dataset
+
+```bash
+python src/simulate.py      # customers -> event log (data/synthetic/events_log.csv), ~1 min
+python src/features.py      # event log -> feature table (data/synthetic/cardless_features.csv), ~1 min
+python src/validate.py      # constraint checks, summary, "too easy" check
+pytest -q                   # generator tests on a small population
+```
+
+All parameters live in `config/generator.yaml`; the same seed gives the same dataset. Column meanings: `docs/data_dictionary.md`.
+
 ## Status
 
 - [x] Dataset design draft (`docs/dataset_design.md`)
-- [x] Generator sketch (`src/generator_sketch.py`)
-- [ ] Full generator + event log
+- [x] Generator v1: event log, streaming features, validation, tests
 - [ ] EDA
 - [ ] Rule-based, anomaly and hybrid models
 - [ ] Dashboard
