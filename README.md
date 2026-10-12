@@ -29,6 +29,7 @@ pip install -r requirements.txt
 python src/simulate.py      # customers -> event log (data/synthetic/events_log.csv), ~1 min
 python src/features.py      # event log -> feature table (data/synthetic/cardless_features.csv), ~1 min
 python src/validate.py      # constraint checks, summary, "too easy" check
+python src/eda.py           # EDA figures -> report/figures, tables -> report/tables
 pytest -q                   # generator tests on a small population
 ```
 
@@ -38,7 +39,7 @@ All parameters live in `config/generator.yaml`; the same seed gives the same dat
 
 - [x] Dataset design draft (`docs/dataset_design.md`)
 - [x] Generator v1: event log, streaming features, validation, tests
-- [ ] EDA
+- [x] EDA figures and findings (`docs/eda_findings.md`)
 - [ ] Rule-based, anomaly and hybrid models
 - [ ] Dashboard
 - [ ] Report

@@ -279,7 +279,7 @@ class Simulator:
 
         def redemption():
             if flags["fast_redeem"]:
-                delay = rng.uniform(*sc["fast_redeem_range_min"])
+                delay = rng.lognormal(np.log(sc["fast_redeem_median_min"]), sc["fast_redeem_sigma"])
             else:
                 delay = rng.lognormal(np.log(sc["slow_redeem_median_min"]), 0.8)
             return delay, self.point_near(cash_loc, 0.01), "ATM" if rng.random() < 0.9 else "RETAIL"
@@ -292,14 +292,14 @@ class Simulator:
         vouchers = []
         if stype == "scam_split":
             for _ in range(int(rng.integers(2, 5))):
-                vouchers.append((rng.uniform(0.15, 0.35) * limit_guess, rid, redemption()))
+                vouchers.append((rng.beta(3, 7) * limit_guess, rid, redemption()))
         else:
             if flags["high_amount"]:
-                amount = rng.uniform(0.8, 1.0) * limit_guess
+                amount = rng.beta(8, 1.5) * limit_guess          # mostly close to the limit
             elif stype == "scam_subtle":
-                amount = c["typical_amount"] * rng.uniform(1.5, 3.0)
+                amount = c["typical_amount"] * rng.lognormal(np.log(2.0), 0.3)
             else:
-                amount = c["typical_amount"] * rng.uniform(1.0, 2.5)
+                amount = c["typical_amount"] * rng.lognormal(np.log(1.6), 0.4)
             vouchers.append((amount, rid, redemption()))
         return [{"t": day * MIN_PER_DAY + hour * 60, "kind": "voucher", "scenario": stype, "episode": ep,
                  "secs": float(secs), "screens": screens, "pre": pre, "vouchers": vouchers}]
@@ -350,7 +350,14 @@ class Simulator:
                         t += rng.uniform(40, 150) / 60
                     day, month = int(t // MIN_PER_DAY), (self.start + pd.Timedelta(minutes=t)).month
                     room = min(limit - spent_day.get(day, 0), p["monthly_limit"] - spent_month.get(month, 0))
-                    amount = min(self.round_amount(amount), room - room % p["amount_step"])
+                    amount = self.round_amount(amount)
+                    if (amount > room and limit < p["max_daily_limit"] and not s["scenario"].startswith("scam")
+                            and rng.random() < p["p_raise_on_demand"]):
+                        # legitimate customer raises their limit to fit a larger voucher
+                        limit = p["max_daily_limit"]
+                        ev(t - rng.uniform(30, 90) / 60, sid, "change_limit", new_limit=limit)
+                        room = min(limit - spent_day.get(day, 0), p["monthly_limit"] - spent_month.get(month, 0))
+                    amount = min(amount, room - room % p["amount_step"])
                     if amount < p["amount_step"]:
                         continue                                    # limit reached: voucher not created
                     if rid != SELF and rid not in used_recipients and rid not in added:

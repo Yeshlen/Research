@@ -1,17 +1,17 @@
-vouchers: 219,208 from 19,035 customers; scam: 2,861 (1.31%); redeemed: 96.8%
-vouchers per customer: mean 12, std 15, min 1, 25% 3, 50% 7, 75% 14, 95% 37, max 198; share with 1-2: 18%; share with 50+: 2.7%
+vouchers: 216,147 from 19,078 customers; scam: 2,761 (1.28%); redeemed: 96.8%
+vouchers per customer: mean 11, std 15, min 1, 25% 3, 50% 7, 75% 14, 95% 36, max 200; share with 1-2: 18%; share with 50+: 2.6%
 scenario counts by split:
 split              test   train
 scenario_type                  
-legit_emergency     264     519
-legit_new_phone     592    1034
-legit_travel        302     502
-normal            83097  130037
-scam_classic        258     372
-scam_limit_raise    180     267
-scam_self_send      186     272
-scam_split          369     618
-scam_subtle         137     202
+legit_emergency     268     515
+legit_new_phone     550    1007
+legit_travel        288     567
+normal            81679  128512
+scam_classic        269     384
+scam_limit_raise    189     236
+scam_self_send      192     255
+scam_split          358     546
+scam_subtle         154     178
 constraint violations (all should be 0):
   OK   amount not a multiple of step: 0
   OK   amount above max daily limit: 0
@@ -25,5 +25,5 @@ constraint violations (all should be 0):
   OK   self-send flagged as added recipient: 0
   OK   voucher before account opened: 0
   OK   missing label: 0
-too-easy check, depth-3 tree, stage A (creation): precision 0.12, recall 0.77, PR-AUC 0.36; splits on limit_increase_24h (0.47), amount (0.34), vouchers_in_session (0.18), recipient_known (0.01)
-too-easy check, depth-3 tree, stage B (redemption): precision 0.14, recall 0.82, PR-AUC 0.17; splits on redeem_delay_min (0.65), limit_increase_24h (0.16), redeem_dist_home_km (0.10), amount_ratio_to_avg_90d (0.06)
+too-easy check, depth-3 tree, stage A (creation): precision 0.11, recall 0.79, PR-AUC 0.18; splits on amount (0.48), vouchers_in_session (0.28), amount_ratio_to_avg_90d (0.13), recipient_known (0.05)
+too-easy check, depth-3 tree, stage B (redemption): precision 0.11, recall 0.86, PR-AUC 0.23; splits on redeem_delay_min (0.61), amount_ratio_to_avg_90d (0.18), redeem_dist_home_km (0.15), hour_deviation (0.03)

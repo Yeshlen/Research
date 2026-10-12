@@ -17,6 +17,7 @@ product:                       # generic South African cardless voucher product
   p_round_100: 0.6             # assumption: people prefer round hundreds
   voucher_expiry_days: 30      # source: Absa CashSend, Nedbank FAQ
   p_start_raised_limit: 0.12   # assumption: share of customers who already raised their limit before the window
+  p_raise_on_demand: 0.6       # assumption: a legit customer whose voucher exceeds the limit raises it in-session
 
 # share, median vouchers per month, median voucher amount (R), mean background app sessions per month
 segments:
@@ -44,7 +45,7 @@ behaviour:
   bg_sessions_scale: 0.3       # background sessions = segment sessions * this (keeps log size manageable)
   p_device_change_per_month: 0.03
   p_password_reset_per_month: 0.02
-  p_legit_limit_raise_per_month: 0.01
+  p_legit_limit_raise_per_month: 0.03
 
 session:                       # seconds from login to voucher creation
   habitual_median_s: 70        # experienced users are fast
@@ -78,7 +79,8 @@ scam:
   p_coached: 0.45              # scammer talks victim through the app: slow session, many screens
   rushed_median_s: 80
   coached_median_s: 540
-  fast_redeem_range_min: [2, 25]
+  fast_redeem_median_min: 10
+  fast_redeem_sigma: 0.6
   slow_redeem_median_min: 60
   p_far_redeem: 0.5            # fraudster cash-out point in another metro
   p_night: 0.08
