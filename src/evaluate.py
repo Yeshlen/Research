@@ -1,9 +1,9 @@
 """
-Evaluate rule-based, Isolation Forest and hybrid risk scoring on the synthetic dataset.
+Evaluate rule-based, anomaly (Isolation Forest, LOF, One-Class SVM, autoencoder) and hybrid risk scoring.
 
 Protocol (no test information is used to tune anything):
-  fit         train split, days 0-89   -> Isolation Forest is fitted here (labels unused)
-  validation  train split, days 90-119 -> hybrid weight w and alert thresholds are chosen here
+  fit         train split, days 0-89   -> anomaly models are fitted here (labels unused)
+  validation  train split, days 90-119 -> LOF k, OCSVM nu, hybrid weight w and alert thresholds are chosen here
   test        days 120-179             -> all reported numbers
 
 Stage A scores every voucher at creation. Stage B re-scores redeemed vouchers at cash-out,
@@ -22,12 +22,21 @@ from sklearn.metrics import average_precision_score, precision_recall_curve, roc
 
 sys.path.insert(0, os.path.dirname(__file__))
 from eda import AXIS, INK2, LEGIT, MUTED, SCAM, plt, save  # noqa: E402  (shared figure style)
-from models import (STAGE_A_FEATURES, STAGE_B_FEATURES, band, hybrid_score,  # noqa: E402
-                    isolation_forest, rule_score)
+from models import (STAGE_A_FEATURES, STAGE_B_FEATURES, autoencoder, band, hybrid_score,  # noqa: E402
+                    isolation_forest, lof, one_class_svm, rule_score)
 
 VAL_START = 90
 WEIGHTS = np.round(np.arange(0, 1.01, 0.1), 1)
-MODEL_COLOR = {"Rules": INK2, "Isolation Forest": LEGIT, "Hybrid": SCAM}
+# name -> (short name used in hybrid labels, factory taking (features, seed, hyperparameter), validation grid)
+ANOMALY = {
+    "Isolation Forest": ("IF", lambda f, seed, _: isolation_forest(f, seed), [None]),
+    "LOF": ("LOF", lambda f, seed, k: lof(f, k, seed), [20, 50, 100, 200]),
+    "One-Class SVM": ("OCSVM", lambda f, seed, nu: one_class_svm(f, nu, seed), [0.01, 0.05, 0.1, 0.2]),
+    "Autoencoder": ("AE", lambda f, seed, _: autoencoder(f, seed), [None]),
+}
+MODEL_COLOR = {"Rules": INK2, "Isolation Forest": LEGIT, "LOF": "#1baf7a", "One-Class SVM": "#6250d6",
+               "Autoencoder": "#eda100"}
+HYBRID_COLOR = SCAM
 SCENARIO_ORDER = ["scam_classic", "scam_self_send", "scam_limit_raise", "scam_split", "scam_subtle",
                   "normal", "legit_emergency", "legit_new_phone", "legit_travel"]
 
@@ -52,31 +61,48 @@ def metrics(y, s, thr):
 
 
 def run_stage(df, stage, seed):
-    """Score one stage. Returns per-model test scores, chosen thresholds and the hybrid weight."""
+    """Score one stage on validation and test; tune everything on validation only."""
     features = STAGE_A_FEATURES if stage == "A" else STAGE_B_FEATURES
     if stage == "B":
         df = df[df.redeemed == 1]
     fit = df[(df.split == "train") & (df.day < VAL_START)]
     val = df[(df.split == "train") & (df.day >= VAL_START)]
     test = df[df.split == "test"]
-
-    iforest = isolation_forest(features, seed).fit(fit)
-    scores = {}
-    for name, part in (("val", val), ("test", test)):
-        rule = rule_score(part, stage)[0]
-        scores[name] = {"Rules": rule, "Isolation Forest": iforest.score(part)}
-
-    # hybrid weight: best validation PR-AUC
     yv = val.is_scam.to_numpy()
-    w_auc = {w: average_precision_score(yv, hybrid_score(scores["val"]["Rules"],
-                                                         scores["val"]["Isolation Forest"], w))
-             for w in WEIGHTS}
-    w = max(w_auc, key=w_auc.get)
-    for name in scores:
-        scores[name]["Hybrid"] = hybrid_score(scores[name]["Rules"], scores[name]["Isolation Forest"], w)
 
-    thresholds = {m: best_f1_threshold(yv, s) for m, s in scores["val"].items()}
-    return test, scores["test"], thresholds, w, w_auc
+    val_s = {"Rules": rule_score(val, stage)[0]}
+    test_s = {"Rules": rule_score(test, stage)[0]}
+    tuning = []
+    for name, (_, make, grid) in ANOMALY.items():
+        best = None
+        for hp in grid:
+            scorer = make(features, seed, hp).fit(fit)
+            v = scorer.score(val)
+            ap_v = average_precision_score(yv, v)
+            tuning.append({"stage": stage, "model": name, "param": hp, "val_pr_auc": ap_v})
+            if best is None or ap_v > best[0]:
+                best = (ap_v, scorer, v)
+        val_s[name], test_s[name] = best[2], best[1].score(test)
+
+    hybrids = {}
+    for name, (short, _, _) in ANOMALY.items():
+        w_auc = {w: average_precision_score(yv, hybrid_score(val_s["Rules"], val_s[name], w)) for w in WEIGHTS}
+        w = max(w_auc, key=w_auc.get)
+        h = f"Rules + {short}"
+        hybrids[h] = {"w": w, "val_pr_auc": w_auc[w]}
+        tuning += [{"stage": stage, "model": h, "param": k, "val_pr_auc": v} for k, v in w_auc.items()]
+        val_s[h] = hybrid_score(val_s["Rules"], val_s[name], w)
+        test_s[h] = hybrid_score(test_s["Rules"], test_s[name], w)
+
+    thresholds = {m: best_f1_threshold(yv, v) for m, v in val_s.items()}
+    best_anomaly = max(ANOMALY, key=lambda m: average_precision_score(yv, val_s[m]))
+    best_hybrid = max(hybrids, key=lambda h: hybrids[h]["val_pr_auc"])
+    return {"test": test, "scores": test_s, "thresholds": thresholds, "hybrids": hybrids, "tuning": tuning,
+            "best_anomaly": best_anomaly, "best_hybrid": best_hybrid}
+
+
+def color(model):
+    return MODEL_COLOR.get(model, HYBRID_COLOR)
 
 
 def scenario_alert_rates(test, alerts):
@@ -90,42 +116,48 @@ def scenario_alert_rates(test, alerts):
 
 
 # ---------------------------------------------------------------- figures
+def stage_title(stage):
+    return "Stage A: at creation" if stage == "A" else "Stage B: at cash-out"
+
+
 def fig_pr_curves(results, out):
-    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.1), sharey=True)
-    for ax, (stage, (test, scores, thresholds, _, _)) in zip(axes, results.items()):
-        y = test.is_scam.to_numpy()
-        for model, s in scores.items():
-            p, r, _ = precision_recall_curve(y, s)
-            ax.plot(r, p, color=MODEL_COLOR[model], lw=1.6,
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.4), sharey=True)
+    for ax, (stage, r) in zip(axes, results.items()):
+        y = r["test"].is_scam.to_numpy()
+        for model in ["Rules", *ANOMALY, r["best_hybrid"]]:
+            s = r["scores"][model]
+            p, rec, _ = precision_recall_curve(y, s)
+            hyb = model == r["best_hybrid"]
+            ax.plot(rec, p, color=color(model), lw=2 if hyb else 1.3,
                     label=f"{model} (AP {average_precision_score(y, s):.2f})")
-            m = metrics(y, s, thresholds[model])
-            ax.plot(m["recall"], m["precision"], "o", color=MODEL_COLOR[model], ms=5, mec="white")
+            if model == "Rules" or hyb:
+                m = metrics(y, s, r["thresholds"][model])
+                ax.plot(m["recall"], m["precision"], "o", color=color(model), ms=5, mec="white", zorder=5)
         ax.axhline(y.mean(), color=MUTED, lw=0.8, ls="--")
         ax.text(0.01, y.mean() + 0.015, f"base rate {y.mean():.1%}", color=MUTED, ha="left", va="bottom",
                 fontsize=7.5)
-        ax.set(xlim=(0, 1), ylim=(0, 1), xlabel="Recall",
-               title="Stage A: at creation" if stage == "A" else "Stage B: at cash-out")
-        ax.legend(loc="upper right", fontsize=7.5)
+        ax.set(xlim=(0, 1), ylim=(0, 1), xlabel="Recall", title=stage_title(stage))
+        ax.legend(loc="upper right", fontsize=7)
     axes[0].set_ylabel("Precision")
-    fig.text(0.5, -0.04, "Test split (days 120-179). Dots: operating threshold chosen on validation.",
-             ha="center", color=MUTED, fontsize=7.5)
+    fig.text(0.5, -0.04, "Test split (days 120-179). Hybrid shown: best on validation. "
+             "Dots: operating threshold chosen on validation.", ha="center", color=MUTED, fontsize=7.5)
     save(fig, out, "pr_curves")
 
 
-def fig_scenarios(rates, out):
+def fig_scenarios(results, rates, out):
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.4), sharey=True)
     y = np.arange(len(SCENARIO_ORDER))
     h = 0.26
-    for ax, (stage, r) in zip(axes, rates.items()):
-        for i, model in enumerate(MODEL_COLOR):
-            ax.barh(y + (i - 1) * h, r[model], height=h, color=MODEL_COLOR[model], label=model)
+    for ax, (stage, r) in zip(axes, results.items()):
+        shown = ["Rules", r["best_anomaly"], r["best_hybrid"]]
+        for i, model in enumerate(shown):
+            ax.barh(y + (i - 1) * h, rates[stage][model], height=h, color=color(model), label=model)
         ax.axhline(4.5, color=AXIS, lw=0.8)
-        ax.set(xlim=(0, 1), title="Stage A: at creation" if stage == "A" else "Stage B: at cash-out",
-               xlabel="Share of vouchers flagged")
+        ax.set(xlim=(0, 1), title=stage_title(stage), xlabel="Share of vouchers flagged")
         ax.grid(axis="y", visible=False)
+        ax.legend(loc="lower right", fontsize=7)
     axes[0].set_yticks(y, [s.replace("_", " ") for s in SCENARIO_ORDER])
     axes[0].invert_yaxis()
-    axes[1].legend(loc="lower right", fontsize=7.5)
     fig.text(0.5, -0.03, "Above the line: scam scenarios (higher is better). "
              "Below: legitimate scenarios (false alarms, lower is better).", ha="center", color=MUTED,
              fontsize=7.5)
@@ -173,40 +205,53 @@ def main():
 
     results = {s: run_stage(df, s, a.seed) for s in ("A", "B")}
     rows, rates = [], {}
-    for stage, (test, scores, thresholds, w, w_auc) in results.items():
+    for stage, r in results.items():
+        test, scores, thresholds = r["test"], r["scores"], r["thresholds"]
         y = test.is_scam.to_numpy()
-        print(f"\nStage {stage}: {len(test):,} test vouchers, {y.sum():,} scams. Hybrid w = {w} "
-              f"(validation PR-AUC by w: " + ", ".join(f"{k}:{v:.3f}" for k, v in w_auc.items()) + ")")
+        print(f"\nStage {stage}: {len(test):,} test vouchers, {y.sum():,} scams. "
+              f"Best anomaly model: {r['best_anomaly']}; best hybrid: {r['best_hybrid']} "
+              f"(w = {r['hybrids'][r['best_hybrid']]['w']})")
         alerts = {}
         for model, s in scores.items():
+            kind = "rules" if model == "Rules" else "hybrid" if model.startswith("Rules +") else "anomaly"
+            w = r["hybrids"][model]["w"] if kind == "hybrid" else np.nan
             m = metrics(y, s, thresholds[model])
-            rows.append({"stage": stage, "model": model, "operating point": "max F1 on validation", **m})
+            rows.append({"stage": stage, "model": model, "kind": kind, "hybrid_w": w,
+                         "operating point": "max F1 on validation", **m})
             alerts[model] = s >= thresholds[model]
         m = metrics(y, scores["Rules"], 70)
-        rows.append({"stage": stage, "model": "Rules", "operating point": "High band (score >= 70)", **m})
+        rows.append({"stage": stage, "model": "Rules", "kind": "rules", "hybrid_w": np.nan,
+                     "operating point": "High band (score >= 70)", **m})
         rates[stage] = scenario_alert_rates(test, alerts)
         if stage == "A":
             bands = fig_bands(test, scores["Rules"], a.out)
 
     res = pd.DataFrame(rows)
     res.to_csv(f"{a.out}/tables/model_comparison.csv", index=False)
-    tex = res.assign(Stage=res.stage, Model=res.model + np.where(res["operating point"].str.startswith("High"),
-                                                                   " ($\\geq$70)", ""))
+    pd.DataFrame([t for r in results.values() for t in r["tuning"]]).to_csv(
+        f"{a.out}/tables/validation_tuning.csv", index=False)
+    label = res.model.str.replace("Rules + ", "Hybrid: Rules + ", regex=False)
+    label = label.where(~res["operating point"].str.startswith("High"), label + " ($\\geq$70)")
+    label = label.where(res.hybrid_w.isna(), label + " ($w$=" + res.hybrid_w.map("{:.1f}".format) + ")")
+    tex = res.assign(Stage=res.stage, Model=label)
     tex = tex.set_index(["Stage"])[["Model", "precision", "recall", "f1", "fpr", "pr_auc", "roc_auc"]]
     tex.columns = ["Model", "Precision", "Recall", "F1", "FPR", "PR-AUC", "ROC-AUC"]
     tex[tex.columns[1:]] = tex[tex.columns[1:]].map(lambda v: f"{v:.3f}")
     write_tex(tex, f"{a.out}/tables/model_comparison.tex",
-              "Risk scoring on the test split (days 120--179). Thresholds and hybrid weight chosen on "
-              "validation days 90--119.", "tab:model-comparison")
+              "Risk scoring on the test split (days 120--179). Hyperparameters, hybrid weights $w$ and "
+              "thresholds chosen on validation days 90--119.", "tab:model-comparison")
 
     scen = pd.concat(rates, names=["stage"]).round(3)
     scen.to_csv(f"{a.out}/tables/scenario_detection.csv")
     fig_pr_curves(results, a.out)
-    fig_scenarios(rates, a.out)
+    fig_scenarios(results, rates, a.out)
 
-    pd.set_option("display.width", 160)
-    print("\n" + res[["stage", "model", "operating point", "threshold", "precision", "recall", "f1", "fpr",
-                      "alert_rate", "pr_auc", "roc_auc"]].round(3).to_string(index=False))
+    pd.set_option("display.width", 200)
+    print("\n" + res[["stage", "model", "hybrid_w", "operating point", "precision", "recall", "f1", "fpr",
+                      "pr_auc", "roc_auc"]].round(3).to_string(index=False))
+    print("\nValidation tuning (anomaly hyperparameters):")
+    tun = pd.DataFrame([t for r in results.values() for t in r["tuning"]])
+    print(tun[~tun.model.str.startswith("Rules")].round(3).to_string(index=False))
     print("\nShare flagged per scenario (test):\n" + scen.to_string())
     print("\nRule risk bands, stage A test (count by class):\n" + bands.astype(int).to_string())
 

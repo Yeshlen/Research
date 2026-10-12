@@ -30,7 +30,7 @@ python src/simulate.py      # customers -> event log (data/synthetic/events_log.
 python src/features.py      # event log -> feature table (data/synthetic/cardless_features.csv), ~1 min
 python src/validate.py      # constraint checks, summary, "too easy" check
 python src/eda.py           # EDA figures -> report/figures, tables -> report/tables
-python src/evaluate.py      # rules, Isolation Forest, hybrid on the test split (~20 s)
+python src/evaluate.py      # rules, IF, LOF, OCSVM, autoencoder, hybrids on the test split (~2 min)
 pytest -q                   # generator and scoring tests on a small population
 ```
 
@@ -42,6 +42,7 @@ All parameters live in `config/generator.yaml`; the same seed gives the same dat
 - [x] Generator v1: event log, streaming features, validation, tests
 - [x] EDA figures and findings (`docs/eda_findings.md`)
 - [x] Rule-based, Isolation Forest and hybrid scoring (`docs/model_results.md`)
-- [ ] LOF, One-Class SVM, autoencoder; learning curve and sensitivity analysis
+- [x] LOF, One-Class SVM, autoencoder and their hybrids
+- [ ] Learning curve and sensitivity analysis
 - [ ] Dashboard
 - [ ] Report

@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 
 from test_generator import cfg, dataset  # noqa: F401  (shared fixtures)
-from models import STAGE_A_FEATURES, STAGE_B_FEATURES, band, hybrid_score, isolation_forest, rule_score
+from models import (STAGE_A_FEATURES, STAGE_B_FEATURES, REDUNDANT, autoencoder, band, hybrid_score,
+                    isolation_forest, lof, one_class_svm, rule_score)
 
 
 @pytest.fixture(scope="module")
@@ -35,3 +36,12 @@ def test_isolation_forest_percentile(df):
         assert s.min() >= 0 and s.max() <= 1
     h = hybrid_score(np.array([0, 100]), np.array([1.0, 0.0]), 0.5)
     assert np.allclose(h, [0.5, 0.5])
+
+
+@pytest.mark.parametrize("make", [lof, one_class_svm, autoencoder])
+def test_distance_and_neural_scorers(df, make):
+    train = df[df.split == "train"]
+    scorer = make(STAGE_A_FEATURES).fit(train)
+    assert not REDUNDANT & set(scorer.features)
+    s = scorer.score(df)
+    assert s.min() >= 0 and s.max() <= 1 and np.isfinite(s).all()
