@@ -1,0 +1,19 @@
+stage,scenario_type,n_test,Rules,Isolation Forest,Hybrid
+A,scam_classic,269,0.502,0.204,0.39
+A,scam_self_send,192,0.172,0.271,0.339
+A,scam_limit_raise,189,0.688,0.587,0.725
+A,scam_split,358,0.179,0.366,0.43
+A,scam_subtle,154,0.058,0.052,0.058
+A,normal,81679,0.002,0.005,0.005
+A,legit_emergency,268,0.455,0.451,0.582
+A,legit_new_phone,550,0.085,0.033,0.069
+A,legit_travel,288,0.003,0.007,0.007
+B,scam_classic,269,0.532,0.264,0.654
+B,scam_self_send,192,0.255,0.401,0.417
+B,scam_limit_raise,189,0.688,0.63,0.815
+B,scam_split,358,0.302,0.405,0.517
+B,scam_subtle,154,0.071,0.058,0.143
+B,normal,78643,0.002,0.009,0.006
+B,legit_emergency,264,0.356,0.542,0.523
+B,legit_new_phone,529,0.017,0.064,0.081
+B,legit_travel,282,0.004,0.011,0.007

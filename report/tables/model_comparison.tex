@@ -1,0 +1,19 @@
+\begin{table}[ht]
+\centering\small
+\caption{Risk scoring on the test split (days 120--179). Thresholds and hybrid weight chosen on validation days 90--119.}
+\label{tab:model-comparison}
+\begin{tabular}{lrrrrrrr}
+\hline
+Stage & Model & Precision & Recall & F1 & FPR & PR-AUC & ROC-AUC \\
+\hline
+A & Rules & 0.513 & 0.319 & 0.394 & 0.004 & 0.302 & 0.916 \\
+A & Isolation Forest & 0.398 & 0.307 & 0.347 & 0.007 & 0.298 & 0.898 \\
+A & Hybrid & 0.441 & 0.404 & 0.422 & 0.007 & 0.357 & 0.911 \\
+A & Rules ($\geq$70) & 0.619 & 0.182 & 0.281 & 0.002 & 0.302 & 0.916 \\
+B & Rules & 0.639 & 0.380 & 0.476 & 0.003 & 0.420 & 0.942 \\
+B & Isolation Forest & 0.315 & 0.362 & 0.337 & 0.011 & 0.283 & 0.900 \\
+B & Hybrid & 0.492 & 0.531 & 0.511 & 0.008 & 0.484 & 0.952 \\
+B & Rules ($\geq$70) & 0.419 & 0.524 & 0.466 & 0.011 & 0.420 & 0.942 \\
+\hline
+\end{tabular}
+\end{table}
