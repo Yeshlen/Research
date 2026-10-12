@@ -60,20 +60,29 @@ def metrics(y, s, thr):
             "tp": tp, "fp": fp, "fn": fn, "tn": tn}
 
 
-def run_stage(df, stage, seed):
-    """Score one stage on validation and test; tune everything on validation only."""
-    features = STAGE_A_FEATURES if stage == "A" else STAGE_B_FEATURES
+def split_stage(df, stage):
+    """Rows scored at this stage, split into fit / validation / test periods."""
     if stage == "B":
         df = df[df.redeemed == 1]
     fit = df[(df.split == "train") & (df.day < VAL_START)]
     val = df[(df.split == "train") & (df.day >= VAL_START)]
-    test = df[df.split == "test"]
+    return fit, val, df[df.split == "test"]
+
+
+def run_stage(df, stage, seed, anomaly=None):
+    """Score one stage on validation and test; tune everything on validation only."""
+    return score_stage(*split_stage(df, stage), stage, seed, anomaly)
+
+
+def score_stage(fit, val, test, stage, seed, anomaly=None):
+    anomaly = anomaly or ANOMALY
+    features = STAGE_A_FEATURES if stage == "A" else STAGE_B_FEATURES
     yv = val.is_scam.to_numpy()
 
     val_s = {"Rules": rule_score(val, stage)[0]}
     test_s = {"Rules": rule_score(test, stage)[0]}
     tuning = []
-    for name, (_, make, grid) in ANOMALY.items():
+    for name, (_, make, grid) in anomaly.items():
         best = None
         for hp in grid:
             scorer = make(features, seed, hp).fit(fit)
@@ -85,7 +94,7 @@ def run_stage(df, stage, seed):
         val_s[name], test_s[name] = best[2], best[1].score(test)
 
     hybrids = {}
-    for name, (short, _, _) in ANOMALY.items():
+    for name, (short, _, _) in anomaly.items():
         w_auc = {w: average_precision_score(yv, hybrid_score(val_s["Rules"], val_s[name], w)) for w in WEIGHTS}
         w = max(w_auc, key=w_auc.get)
         h = f"Rules + {short}"
@@ -95,10 +104,10 @@ def run_stage(df, stage, seed):
         test_s[h] = hybrid_score(test_s["Rules"], test_s[name], w)
 
     thresholds = {m: best_f1_threshold(yv, v) for m, v in val_s.items()}
-    best_anomaly = max(ANOMALY, key=lambda m: average_precision_score(yv, val_s[m]))
+    best_anomaly = max(anomaly, key=lambda m: average_precision_score(yv, val_s[m]))
     best_hybrid = max(hybrids, key=lambda h: hybrids[h]["val_pr_auc"])
-    return {"test": test, "scores": test_s, "thresholds": thresholds, "hybrids": hybrids, "tuning": tuning,
-            "best_anomaly": best_anomaly, "best_hybrid": best_hybrid}
+    return {"test": test, "scores": test_s, "val_scores": val_s, "thresholds": thresholds, "hybrids": hybrids,
+            "tuning": tuning, "best_anomaly": best_anomaly, "best_hybrid": best_hybrid}
 
 
 def color(model):

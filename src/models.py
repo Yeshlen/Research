@@ -65,18 +65,21 @@ def band(score):
 
 
 # ---------------------------------------------------------------- rules
-def rule_score(df, stage="A"):
-    """Return (score 0-100, list of fired reasons per row)."""
+def rule_hits(df, stage="A"):
+    """Boolean matrix (rows x rules) of which rules fire, with the rules used at this stage."""
     stages = {"A"} if stage == "A" else {"A", "B"}
-    score = np.zeros(len(df))
-    fired = []
-    for name, pts, st, test, reason in RULES:
-        if st in stages:
-            hit = test(df).fillna(False).to_numpy(dtype=bool)
-            score += pts * hit
-            fired.append((hit, reason))
-    reasons = [[r for hit, r in fired if hit[i]] for i in range(len(df))]
-    return np.minimum(score, 100), reasons
+    rules = [r for r in RULES if r[2] in stages]
+    hits = np.column_stack([r[3](df).fillna(False).to_numpy(dtype=bool) for r in rules])
+    return hits, rules
+
+
+def rule_score(df, stage="A", weights=None):
+    """Return (score 0-100, list of fired reasons per row). weights overrides the rule points."""
+    hits, rules = rule_hits(df, stage)
+    pts = np.array([r[1] for r in rules] if weights is None else weights, dtype=float)
+    score = np.minimum(hits @ pts, 100)
+    reasons = [[rules[j][4] for j in np.flatnonzero(row)] for row in hits]
+    return score, reasons
 
 
 # ---------------------------------------------------------------- anomaly models
