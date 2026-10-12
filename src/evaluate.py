@@ -23,7 +23,7 @@ from sklearn.metrics import average_precision_score, precision_recall_curve, roc
 sys.path.insert(0, os.path.dirname(__file__))
 from eda import AXIS, INK2, LEGIT, MUTED, SCAM, plt, save  # noqa: E402  (shared figure style)
 from models import (STAGE_A_FEATURES, STAGE_B_FEATURES, autoencoder, band, hybrid_score,  # noqa: E402
-                    isolation_forest, lof, one_class_svm, rule_score)
+                    isolation_forest, lof, one_class_svm, rule_score, supervised_gbm)
 
 VAL_START = 90
 WEIGHTS = np.round(np.arange(0, 1.01, 0.1), 1)
@@ -34,8 +34,9 @@ ANOMALY = {
     "One-Class SVM": ("OCSVM", lambda f, seed, nu: one_class_svm(f, nu, seed), [0.01, 0.05, 0.1, 0.2]),
     "Autoencoder": ("AE", lambda f, seed, _: autoencoder(f, seed), [None]),
 }
+SUPERVISED = "Supervised GBM"
 MODEL_COLOR = {"Rules": INK2, "Isolation Forest": LEGIT, "LOF": "#1baf7a", "One-Class SVM": "#6250d6",
-               "Autoencoder": "#eda100"}
+               "Autoencoder": "#eda100", SUPERVISED: "#008300"}
 HYBRID_COLOR = SCAM
 SCENARIO_ORDER = ["scam_classic", "scam_self_send", "scam_limit_raise", "scam_split", "scam_subtle",
                   "normal", "legit_emergency", "legit_new_phone", "legit_travel"]
@@ -69,12 +70,12 @@ def split_stage(df, stage):
     return fit, val, df[df.split == "test"]
 
 
-def run_stage(df, stage, seed, anomaly=None):
+def run_stage(df, stage, seed, anomaly=None, supervised=False):
     """Score one stage on validation and test; tune everything on validation only."""
-    return score_stage(*split_stage(df, stage), stage, seed, anomaly)
+    return score_stage(*split_stage(df, stage), stage, seed, anomaly, supervised)
 
 
-def score_stage(fit, val, test, stage, seed, anomaly=None):
+def score_stage(fit, val, test, stage, seed, anomaly=None, supervised=False):
     anomaly = anomaly or ANOMALY
     features = STAGE_A_FEATURES if stage == "A" else STAGE_B_FEATURES
     yv = val.is_scam.to_numpy()
@@ -102,6 +103,10 @@ def score_stage(fit, val, test, stage, seed, anomaly=None):
         tuning += [{"stage": stage, "model": h, "param": k, "val_pr_auc": v} for k, v in w_auc.items()]
         val_s[h] = hybrid_score(val_s["Rules"], val_s[name], w)
         test_s[h] = hybrid_score(test_s["Rules"], test_s[name], w)
+
+    if supervised:   # upper-bound benchmark: the only model that sees labels (fit period only)
+        gbm = supervised_gbm(features, seed).fit(fit)
+        val_s[SUPERVISED], test_s[SUPERVISED] = gbm.score(val), gbm.score(test)
 
     thresholds = {m: best_f1_threshold(yv, v) for m, v in val_s.items()}
     best_anomaly = max(anomaly, key=lambda m: average_precision_score(yv, val_s[m]))
@@ -133,12 +138,16 @@ def fig_pr_curves(results, out):
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.4), sharey=True)
     for ax, (stage, r) in zip(axes, results.items()):
         y = r["test"].is_scam.to_numpy()
-        for model in ["Rules", *ANOMALY, r["best_hybrid"]]:
+        ax.set_box_aspect(0.85)
+        for model in ["Rules", *ANOMALY, r["best_hybrid"], SUPERVISED]:
+            if model not in r["scores"]:
+                continue
             s = r["scores"][model]
             p, rec, _ = precision_recall_curve(y, s)
             hyb = model == r["best_hybrid"]
-            ax.plot(rec, p, color=color(model), lw=2 if hyb else 1.3,
-                    label=f"{model} (AP {average_precision_score(y, s):.2f})")
+            ax.plot(rec, p, color=color(model), lw=2 if hyb else 1.3, ls="--" if model == SUPERVISED else "-",
+                    label=f"{model} (AP {average_precision_score(y, s):.2f})"
+                    + (", uses labels" if model == SUPERVISED else ""))
             if model == "Rules" or hyb:
                 m = metrics(y, s, r["thresholds"][model])
                 ax.plot(m["recall"], m["precision"], "o", color=color(model), ms=5, mec="white", zorder=5)
@@ -146,21 +155,23 @@ def fig_pr_curves(results, out):
         ax.text(0.01, y.mean() + 0.015, f"base rate {y.mean():.1%}", color=MUTED, ha="left", va="bottom",
                 fontsize=7.5)
         ax.set(xlim=(0, 1), ylim=(0, 1), xlabel="Recall", title=stage_title(stage))
-        ax.legend(loc="upper right", fontsize=7)
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), fontsize=7, ncol=1)
     axes[0].set_ylabel("Precision")
-    fig.text(0.5, -0.04, "Test split (days 120-179). Hybrid shown: best on validation. "
-             "Dots: operating threshold chosen on validation.", ha="center", color=MUTED, fontsize=7.5)
+    fig.text(0.5, -0.5, "Test split (days 120-179). Hybrid shown: best on validation. Dashed: supervised "
+             "upper bound trained on labels.\nDots: operating threshold chosen on validation.", ha="center",
+             color=MUTED, fontsize=7.5, va="top")
     save(fig, out, "pr_curves")
 
 
 def fig_scenarios(results, rates, out):
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.4), sharey=True)
     y = np.arange(len(SCENARIO_ORDER))
-    h = 0.26
+    h = 0.2
     for ax, (stage, r) in zip(axes, results.items()):
-        shown = ["Rules", r["best_anomaly"], r["best_hybrid"]]
+        shown = ["Rules", r["best_anomaly"], r["best_hybrid"]] + ([SUPERVISED] if SUPERVISED in r["scores"] else [])
         for i, model in enumerate(shown):
-            ax.barh(y + (i - 1) * h, rates[stage][model], height=h, color=color(model), label=model)
+            ax.barh(y + (i - (len(shown) - 1) / 2) * h, rates[stage][model], height=h, color=color(model),
+                    label=model + (" (labels)" if model == SUPERVISED else ""))
         ax.axhline(4.5, color=AXIS, lw=0.8)
         ax.set(xlim=(0, 1), title=stage_title(stage), xlabel="Share of vouchers flagged")
         ax.grid(axis="y", visible=False)
@@ -212,7 +223,7 @@ def main():
         os.makedirs(os.path.join(a.out, d), exist_ok=True)
     df = pd.read_csv(f"{a.data}/cardless_features.csv")
 
-    results = {s: run_stage(df, s, a.seed) for s in ("A", "B")}
+    results = {s: run_stage(df, s, a.seed, supervised=True) for s in ("A", "B")}
     rows, rates = [], {}
     for stage, r in results.items():
         test, scores, thresholds = r["test"], r["scores"], r["thresholds"]
@@ -222,7 +233,8 @@ def main():
               f"(w = {r['hybrids'][r['best_hybrid']]['w']})")
         alerts = {}
         for model, s in scores.items():
-            kind = "rules" if model == "Rules" else "hybrid" if model.startswith("Rules +") else "anomaly"
+            kind = ("rules" if model == "Rules" else "hybrid" if model.startswith("Rules +")
+                    else "supervised" if model == SUPERVISED else "anomaly")
             w = r["hybrids"][model]["w"] if kind == "hybrid" else np.nan
             m = metrics(y, s, thresholds[model])
             rows.append({"stage": stage, "model": model, "kind": kind, "hybrid_w": w,
@@ -242,6 +254,7 @@ def main():
     label = res.model.str.replace("Rules + ", "Hybrid: Rules + ", regex=False)
     label = label.where(~res["operating point"].str.startswith("High"), label + " ($\\geq$70)")
     label = label.where(res.hybrid_w.isna(), label + " ($w$=" + res.hybrid_w.map("{:.1f}".format) + ")")
+    label = label.str.replace(SUPERVISED, SUPERVISED + " (uses labels; upper bound)", regex=False)
     tex = res.assign(Stage=res.stage, Model=label)
     tex = tex.set_index(["Stage"])[["Model", "precision", "recall", "f1", "fpr", "pr_auc", "roc_auc"]]
     tex.columns = ["Model", "Precision", "Recall", "F1", "FPR", "PR-AUC", "ROC-AUC"]

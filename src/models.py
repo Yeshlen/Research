@@ -8,7 +8,7 @@ can be combined on the same scale.
 """
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import IsolationForest
+from sklearn.ensemble import HistGradientBoostingClassifier, IsolationForest
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
@@ -157,6 +157,30 @@ def one_class_svm(features, nu=0.05, seed=0):
 
 def autoencoder(features, seed=0):
     return PercentileScorer(Autoencoder(seed=seed), distance_features(features), scale=True, seed=seed)
+
+
+# ---------------------------------------------------------------- supervised benchmark
+class SupervisedScorer:
+    """Gradient-boosted trees trained WITH the scam labels.
+
+    Not part of the proposed system (banks rarely have confirmed vishing labels at the start); it is an
+    upper-bound benchmark showing what the same features achieve once labelled scams are available.
+    """
+
+    def __init__(self, features, seed=0):
+        self.features = features
+        self.model = HistGradientBoostingClassifier(max_iter=300, learning_rate=0.05, random_state=seed)
+
+    def fit(self, df):
+        self.model.fit(model_matrix(df, self.features), df.is_scam.to_numpy())
+        return self
+
+    def score(self, df):
+        return self.model.predict_proba(model_matrix(df, self.features))[:, 1]
+
+
+def supervised_gbm(features, seed=0):
+    return SupervisedScorer(features, seed)
 
 
 # ---------------------------------------------------------------- hybrid

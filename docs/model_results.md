@@ -19,6 +19,7 @@ Tables: `report/tables/model_comparison.csv/.tex`, `scenario_detection.csv`, `va
 | One-Class SVM | RBF kernel, `nu` from {0.01, 0.05, 0.1, 0.2} → 0.1; fitted on 10k sampled rows | Boundary-based novelty detection (Schölkopf et al., 2001) |
 | Autoencoder | MLP 32-8-32, 40 epochs, mean squared reconstruction error | Reconstruction-based, common in recent fraud work |
 | Hybrid | `w·rules/100 + (1−w)·anomaly percentile`, one per anomaly model | The proposal's combined design |
+| Supervised GBM (benchmark) | Histogram gradient boosting, 300 iterations, trained **with labels** on days 0–89 | Upper bound: what the same features achieve once confirmed scams exist. Not part of the proposed system |
 
 LOF, OCSVM and the autoencoder use standardised features. They also drop `amount_to_limit_ratio` and `recipient_added_in_session`, which nearly duplicate `amount` and `recipient_known` (EDA |r| ≈ 0.9) and would otherwise be double-counted in distances.
 
@@ -36,6 +37,7 @@ LOF, OCSVM and the autoencoder use standardised features. They also drop `amount
 | A | **Rules + OCSVM (w=0.1)** | 0.46 | **0.54** | **0.49** | 0.9% | **0.42** | 0.91 |
 | A | Rules + AE (w=0.8) | 0.35 | 0.45 | 0.39 | 1.2% | 0.34 | 0.92 |
 | A | Rules ≥ 70 | 0.62 | 0.18 | 0.28 | 0.2% | | |
+| A | *Supervised GBM (uses labels)* | *0.89* | *0.63* | *0.74* | *0.1%* | *0.81* | *0.99* |
 | B | Rules | 0.64 | 0.38 | 0.48 | 0.3% | 0.42 | 0.94 |
 | B | Isolation Forest | 0.32 | 0.36 | 0.34 | 1.1% | 0.28 | 0.90 |
 | B | LOF | 0.34 | 0.35 | 0.35 | 1.0% | 0.26 | 0.82 |
@@ -46,6 +48,7 @@ LOF, OCSVM and the autoencoder use standardised features. They also drop `amount
 | B | **Rules + OCSVM (w=0.3)** | 0.56 | **0.54** | **0.55** | 0.6% | **0.51** | 0.94 |
 | B | Rules + AE (w=0.9) | 0.60 | 0.40 | 0.48 | 0.4% | 0.45 | 0.95 |
 | B | Rules ≥ 70 | 0.42 | 0.52 | 0.47 | 1.1% | | |
+| B | *Supervised GBM (uses labels)* | *0.89* | *0.85* | *0.87* | *0.2%* | *0.93* | *1.00* |
 
 The hybrid Rules + OCSVM was also the best on validation at both stages, so choosing it involved no test data.
 
@@ -58,6 +61,12 @@ The hybrid Rules + OCSVM was also the best on validation at both stages, so choo
 6. **Legitimate emergencies are the main false alarms** (about 35–70% flagged). They share the scam pattern of a limit raise, a new recipient and an unusual amount. Hybrids catch more scams partly by flagging more of these. A step-up check (call-back or a cooling-off delay) suits these cases better than a block; this is a discussion point for the report.
 7. **The rule bands work as a triage queue.** At stage A, 0.2% of legitimate vouchers reach High or Critical, against 18% of scams. Medium holds 49% of scams and 8% of legitimate vouchers, which is where the anomaly component adds recall.
 8. **Absolute numbers depend on the generator.** They show relative performance on a controlled benchmark, not expected bank performance. `limit_changed_24h` in particular is an assumption-driven signal (see `eda_findings.md`).
+
+## Why the scores look low, and the supervised upper bound
+- **Accuracy is not reported because it is meaningless here.** At a 1.4% scam rate, a model that calls every voucher legitimate scores 98.6% accuracy (the hybrid scores 99.4%). Precision, recall, F1 and PR-AUC on the scam class are the informative metrics. A random score has a PR-AUC equal to the base rate (0.014), so the hybrid's 0.42–0.51 is 30–36 times better than random.
+- **The proposed models never see a label.** That is the premise of the project: banks have few confirmed vishing cases, and new scam scripts appear before labels do. To measure the cost of that, a supervised gradient-boosting model was trained on the same features with the labels from days 0–89. It reaches PR-AUC 0.81 at creation and 0.93 at cash-out (F1 0.74 / 0.87).
+- **The supervised result is an upper bound, not a competitor.** On synthetic data it partly learns the generator's own scam rules, which real fraudsters would not follow so consistently, and it needs a labelled history the bank may not have. The report should therefore present: (1) rules + anomaly detection as the label-free system that works from day one, and (2) supervised learning as the path once confirmed scams accumulate. `docs/robustness.md` (label budget) shows how many confirmed scams that takes.
+- Both approaches tune thresholds on the validation days, which needs some labelled validation data. This is noted as a limitation.
 
 ## Next
 A learning curve over dataset size, sensitivity to scam prevalence, rule weights and random seed, then the dashboard.

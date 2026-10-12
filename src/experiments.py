@@ -8,6 +8,8 @@ Robustness experiments for the risk scoring models.
   5. Limit-raise ablation: remove the assumption-driven limit-raise signal from every model.
   6. Prevalence: subsample test scam episodes to rarer base rates (thresholds kept from validation).
   7. Rule weights: leave-one-rule-out, and random +/-50% perturbation of every rule weight.
+  8. Label budget: the supervised benchmark trained with only n confirmed scams (the rest unlabelled),
+     to show how many confirmed scams a bank needs before supervised learning beats the label-free hybrid.
 
 The same protocol as evaluate.py applies: anything tuned is tuned on validation days 90-119.
 
@@ -26,7 +28,7 @@ from sklearn.metrics import average_precision_score
 sys.path.insert(0, os.path.dirname(__file__))
 from eda import INK2, LEGIT, MUTED, SCAM, plt, save  # noqa: E402
 from evaluate import ANOMALY, metrics, run_stage, score_stage, split_stage  # noqa: E402
-from models import one_class_svm, rule_hits  # noqa: E402
+from models import STAGE_A_FEATURES, STAGE_B_FEATURES, one_class_svm, rule_hits, supervised_gbm  # noqa: E402
 
 # Hyperparameters fixed at the values evaluate.py picked on validation, so repeated runs stay fast
 FIXED = {"Isolation Forest": ANOMALY["Isolation Forest"],
@@ -126,6 +128,27 @@ def rule_weights(df, stage, draws, rng):
     return base, pd.DataFrame(ablation), np.array(perturbed)
 
 
+# ---------------------------------------------------------------- 8. label budget
+def label_budget(df, budgets, seeds):
+    """Train the supervised benchmark when only n scam vouchers are confirmed; unconfirmed scams look legitimate."""
+    rows = []
+    for stage in STAGES:
+        features = STAGE_A_FEATURES if stage == "A" else STAGE_B_FEATURES
+        fit, _, test = split_stage(df, stage)
+        y = test.is_scam.to_numpy()
+        scam_idx = np.flatnonzero(fit.is_scam.to_numpy())
+        for n in budgets:
+            for seed in seeds:
+                keep = np.random.default_rng(seed).choice(scam_idx, min(n, len(scam_idx)), replace=False)
+                labels = np.zeros(len(fit), dtype=int)
+                labels[keep] = 1
+                s = supervised_gbm(features, seed).fit(fit.assign(is_scam=labels)).score(test)
+                rows.append({"stage": stage, "labelled_scams": min(n, len(scam_idx)), "seed": seed,
+                             "pr_auc": average_precision_score(y, s)})
+            print(f"  label budget {stage} n={n}: PR-AUC {np.mean([r['pr_auc'] for r in rows[-len(seeds):]]):.3f}")
+    return pd.DataFrame(rows)
+
+
 # ---------------------------------------------------------------- figures
 def fig_learning_curve(lc, out):
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.0), sharey=True)
@@ -143,6 +166,22 @@ def fig_learning_curve(lc, out):
     fig.text(0.5, -0.09, "Band: min-max over 3 customer samples. Test set fixed at the full test split.",
              ha="center", color=MUTED, fontsize=7.5)
     save(fig, out, "learning_curve")
+
+
+def fig_label_budget(lb, hybrid, out):
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 2.9), sharey=True)
+    for ax, stage in zip(axes, STAGES):
+        g = lb[lb.stage == stage].groupby("labelled_scams").pr_auc.agg(["mean", "min", "max"])
+        ax.plot(g.index, g["mean"], "-o", color="#008300", lw=1.6, ms=3.5, label="Supervised GBM (n labels)")
+        ax.fill_between(g.index, g["min"], g["max"], color="#008300", alpha=0.15, lw=0)
+        ax.axhline(hybrid[stage], color=SCAM, lw=1.6, ls="--", label="Rules + OCSVM (no labels)")
+        ax.set(xscale="log", xlabel="Confirmed scam vouchers available for training", title=f"Stage {stage_name(stage)}",
+               ylim=(0, 1))
+    axes[0].set_ylabel("Test PR-AUC")
+    axes[0].legend(loc="upper left", fontsize=7)
+    fig.text(0.5, -0.06, "Unconfirmed scams stay labelled legitimate. Band: min-max over 3 random draws.",
+             ha="center", color=MUTED, fontsize=7.5)
+    save(fig, out, "label_budget")
 
 
 def fig_sensitivity(prev, ablation, perturbed, out):
@@ -192,7 +231,7 @@ def main():
     pd.set_option("display.width", 200)
 
     print("Main run (all models, seed 0)")
-    main_runs = {s: run_stage(df, s, 0) for s in STAGES}
+    main_runs = {s: run_stage(df, s, 0, supervised=True) for s in STAGES}
 
     # 1. bootstrap CIs
     ci = pd.DataFrame([row for s in STAGES for row in bootstrap(main_runs[s], s, a.bootstrap, rng)])
@@ -254,6 +293,13 @@ def main():
     abl.to_csv(f"{tables}/rule_ablation.csv", index=False)
     print(abl.round(3).to_string(index=False))
     fig_sensitivity(prev, abl, perturbed, a.out)
+
+    # 8. label budget
+    print("\nLabel budget")
+    lb = label_budget(df, [10, 25, 50, 100, 250, 500, 5000], [0, 1, 2])
+    lb.to_csv(f"{tables}/label_budget.csv", index=False)
+    fig_label_budget(lb, {s: pr_aucs(main_runs[s], ["Rules + OCSVM"])["Rules + OCSVM"] for s in STAGES}, a.out)
+    print(lb.groupby(["stage", "labelled_scams"]).pr_auc.agg(["mean", "min", "max"]).round(3).to_string())
 
 
 if __name__ == "__main__":
