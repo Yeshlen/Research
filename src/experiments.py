@@ -175,11 +175,11 @@ def fig_label_budget(lb, hybrid, out):
         ax.plot(g.index, g["mean"], "-o", color="#008300", lw=1.6, ms=3.5, label="Supervised GBM (n labels)")
         ax.fill_between(g.index, g["min"], g["max"], color="#008300", alpha=0.15, lw=0)
         ax.axhline(hybrid[stage], color=SCAM, lw=1.6, ls="--", label="Rules + OCSVM (no labels)")
-        ax.set(xscale="log", xlabel="Confirmed scam vouchers available for training", title=f"Stage {stage_name(stage)}",
+        ax.set(xscale="log", xlabel="Confirmed scams used for training", title=f"Stage {stage_name(stage)}",
                ylim=(0, 1))
     axes[0].set_ylabel("Test PR-AUC")
     axes[0].legend(loc="upper left", fontsize=7)
-    fig.text(0.5, -0.06, "Unconfirmed scams stay labelled legitimate. Band: min-max over 3 random draws.",
+    fig.text(0.5, -0.1, "Unconfirmed scams stay labelled legitimate. Band: min-max over 3 random draws.",
              ha="center", color=MUTED, fontsize=7.5)
     save(fig, out, "label_budget")
 

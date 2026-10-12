@@ -31,7 +31,7 @@ python src/features.py      # event log -> feature table (data/synthetic/cardles
 python src/validate.py      # constraint checks, summary, "too easy" check
 python src/eda.py           # EDA figures -> report/figures, tables -> report/tables
 python src/evaluate.py      # rules, IF, LOF, OCSVM, autoencoder, hybrids on the test split (~2 min)
-python src/experiments.py   # bootstrap CIs, learning curve, seeds, ablations (~10 min; see docs/robustness.md)
+python src/experiments.py   # bootstrap CIs, learning curve, seeds, ablations, label budget (~25 min; see docs/robustness.md)
 python src/score_all.py     # score the test period with Rules + OCSVM for the dashboard (~1 min)
 streamlit run app/dashboard.py
 pytest -q                   # generator and scoring tests on a small population
@@ -46,6 +46,7 @@ All parameters live in `config/generator.yaml`; the same seed gives the same dat
 - [x] EDA figures and findings (`docs/eda_findings.md`)
 - [x] Rule-based, Isolation Forest and hybrid scoring (`docs/model_results.md`)
 - [x] LOF, One-Class SVM, autoencoder and their hybrids
+- [x] Supervised upper-bound benchmark and label-budget curve
 - [x] Learning curve and sensitivity analysis (`docs/robustness.md`)
 - [x] Dashboard (`app/dashboard.py`): alert queue with risk bands and reasons, customer drill-down, model performance
 - [ ] Report
@@ -56,6 +57,7 @@ All parameters live in `config/generator.yaml`; the same seed gives the same dat
 
 - **Alert queue:** choose a day and a scoring point (creation or cash-out) to see that day's alerts. Each shows its risk score, its Low/Medium/High/Critical band and the reasons it was flagged. An evaluation toggle reveals which alerts were real scams.
 - **Customer drill-down:** a customer's vouchers coloured by band, plus their recent account events (limit changes, new devices, new recipients, cash-outs).
+- **Model switch:** the label-free Rules + OCSVM system, or the supervised benchmark for comparison.
 - **Model performance:** the comparison table, band precision, detection per scenario, and the PR, learning-curve and sensitivity figures.
 
 Band cut-offs are set on validation days, never on the days shown: Medium keeps 80% recall, High is the max-F1 alert threshold, and Critical is where precision reaches 70%. Screenshots are in `report/figures/dashboard_*.png`.
