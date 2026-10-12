@@ -140,7 +140,7 @@ def fig_learning_curve(lc, out):
                ylim=(0, 0.6))
     axes[0].set_ylabel("Test PR-AUC")
     axes[1].legend(loc="lower right", fontsize=7)
-    fig.text(0.5, -0.04, "Band: min-max over 3 customer samples. Test set fixed at the full test split.",
+    fig.text(0.5, -0.09, "Band: min-max over 3 customer samples. Test set fixed at the full test split.",
              ha="center", color=MUTED, fontsize=7.5)
     save(fig, out, "learning_curve")
 
@@ -165,7 +165,7 @@ def fig_sensitivity(prev, ablation, perturbed, out):
     ax.axvline(0, color=MUTED, lw=0.8)
     ax.set(xlabel="Change in rules PR-AUC", title="Leave one rule out")
     ax.grid(axis="y", visible=False)
-    ax.legend(fontsize=6.5, loc="lower left")
+    ax.legend(fontsize=6.5, loc="upper center", bbox_to_anchor=(0.5, -0.22), ncol=2)
 
     ax = axes[2]
     for stage, color in zip(STAGES, (LEGIT, SCAM)):
@@ -174,7 +174,7 @@ def fig_sensitivity(prev, ablation, perturbed, out):
         ax.axvline(base, color=color, lw=1.2)
     ax.set(xlabel="Rules PR-AUC", title="Weights ×U(0.5, 1.5)", yticks=[])
     ax.grid(axis="y", visible=False)
-    ax.legend(fontsize=6.5, loc="upper left")
+    ax.legend(fontsize=6.5, loc="upper center", bbox_to_anchor=(0.5, -0.22))
     fig.tight_layout()
     save(fig, out, "sensitivity")
 

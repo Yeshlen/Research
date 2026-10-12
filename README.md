@@ -31,6 +31,7 @@ python src/features.py      # event log -> feature table (data/synthetic/cardles
 python src/validate.py      # constraint checks, summary, "too easy" check
 python src/eda.py           # EDA figures -> report/figures, tables -> report/tables
 python src/evaluate.py      # rules, IF, LOF, OCSVM, autoencoder, hybrids on the test split (~2 min)
+python src/experiments.py   # bootstrap CIs, learning curve, seeds, ablations (~10 min; see docs/robustness.md)
 pytest -q                   # generator and scoring tests on a small population
 ```
 
@@ -43,6 +44,6 @@ All parameters live in `config/generator.yaml`; the same seed gives the same dat
 - [x] EDA figures and findings (`docs/eda_findings.md`)
 - [x] Rule-based, Isolation Forest and hybrid scoring (`docs/model_results.md`)
 - [x] LOF, One-Class SVM, autoencoder and their hybrids
-- [ ] Learning curve and sensitivity analysis
+- [x] Learning curve and sensitivity analysis (`docs/robustness.md`)
 - [ ] Dashboard
 - [ ] Report

@@ -4,7 +4,7 @@ import pytest
 
 from test_generator import cfg, dataset  # noqa: F401  (shared fixtures)
 from models import (STAGE_A_FEATURES, STAGE_B_FEATURES, REDUNDANT, autoencoder, band, hybrid_score,
-                    isolation_forest, lof, one_class_svm, rule_score)
+                    isolation_forest, lof, one_class_svm, rule_hits, rule_score)
 
 
 @pytest.fixture(scope="module")
@@ -23,6 +23,13 @@ def test_rule_score_range_and_reasons(df, stage):
     assert score.min() >= 0 and score.max() <= 100
     assert all((s > 0) == bool(r) for s, r in zip(score, reasons))
     assert score[df.is_scam.to_numpy() == 1].mean() > score[df.is_scam.to_numpy() == 0].mean()
+
+
+def test_rule_weight_override(df):
+    hits, rules = rule_hits(df, "B")
+    assert hits.shape == (len(df), len(rules))
+    assert np.array_equal(rule_score(df, "B", [r[1] for r in rules])[0], rule_score(df, "B")[0])
+    assert (rule_score(df, "B", np.zeros(len(rules)))[0] == 0).all()
 
 
 def test_stage_b_adds_redemption_rules(df):
