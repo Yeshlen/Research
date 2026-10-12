@@ -52,3 +52,14 @@ def test_distance_and_neural_scorers(df, make):
     assert not REDUNDANT & set(scorer.features)
     s = scorer.score(df)
     assert s.min() >= 0 and s.max() <= 1 and np.isfinite(s).all()
+
+
+def test_dashboard_band_cutoffs_are_ordered():
+    from score_all import band_cutoffs, to_band
+    rng = np.random.default_rng(0)
+    y = rng.random(5000) < 0.02
+    s = np.clip(rng.normal(0.5, 0.15, 5000) + 0.3 * y, 0, 1)
+    cut = band_cutoffs(y, s, 0.7)
+    assert cut["Medium"] <= cut["High"] == 70 <= cut["Critical"]
+    assert list(to_band(np.array([0, cut["Medium"], cut["High"], cut["Critical"]]), cut)) == \
+        ["Low", "Medium", "High", "Critical"]
