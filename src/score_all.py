@@ -1,5 +1,6 @@
 """
-Score every test voucher with the deployed model (Rules + One-Class SVM hybrid) for the dashboard.
+Score every test voucher with the deployed model (Rules + One-Class SVM hybrid) for the dashboard, plus the
+supervised upper-bound benchmark (needs labels) for comparison.
 
 Uses the same protocol as evaluate.py: the anomaly model is fitted on days 0-89, the hybrid weight,
 alert threshold and risk band cut-offs are chosen on validation days 90-119, and days 120-179 are scored.
@@ -8,6 +9,7 @@ Band cut-offs on the 0-100 risk score (= 100 x hybrid score), all set on validat
   Medium   -> lowest score that still keeps validation recall at 80%
   High     -> the alert threshold (max F1 on validation)
   Critical -> lowest score where validation precision reaches 70%
+  (raised to 10 points above the alert threshold's own recall / precision when it already exceeds them)
 
 Writes data/synthetic/scored_vouchers.csv, data/synthetic/customer_events_test.parquet and
 data/synthetic/dashboard_meta.json.
@@ -25,7 +27,7 @@ import pandas as pd
 from sklearn.metrics import precision_recall_curve
 
 sys.path.insert(0, os.path.dirname(__file__))
-from evaluate import score_stage, split_stage  # noqa: E402
+from evaluate import SUPERVISED, score_stage, split_stage  # noqa: E402
 from models import one_class_svm, rule_score  # noqa: E402
 
 MODEL = {"One-Class SVM": ("OCSVM", lambda f, seed, nu: one_class_svm(f, nu, seed), [0.1])}
@@ -37,8 +39,13 @@ CRIT_PRECISION = 0.7
 def band_cutoffs(y, s, threshold):
     p, r, t = precision_recall_curve(y, s)
     p, r = p[:-1], r[:-1]
-    medium = t[r >= 0.8].max() if (r >= 0.8).any() else t.min()
-    critical = t[p >= CRIT_PRECISION].min() if (p >= CRIT_PRECISION).any() else t.max()
+    i = np.searchsorted(t, threshold)
+    p_thr, r_thr = p[min(i, len(p) - 1)], r[min(i, len(r) - 1)]
+    # targets stay at 80% recall / 70% precision unless the alert threshold already exceeds them
+    # (as for the supervised benchmark), so every band keeps a distinct meaning
+    rec_target, prec_target = max(0.8, min(r_thr + 0.1, 0.99)), max(CRIT_PRECISION, min(p_thr + 0.1, 0.99))
+    medium = t[r >= rec_target].max() if (r >= rec_target).any() else t.min()
+    critical = t[p >= prec_target].min() if (p >= prec_target).any() else t.max()
     medium = min(medium, threshold)
     critical = max(critical, threshold)
     return {"Medium": 100 * float(medium), "High": 100 * float(threshold), "Critical": 100 * float(critical)}
@@ -65,7 +72,7 @@ def main():
 
     for stage in ("A", "B"):
         fit, val, test = split_stage(df, stage)
-        r = score_stage(fit, val, test, stage, seed=0, anomaly=MODEL)
+        r = score_stage(fit, val, test, stage, seed=0, anomaly=MODEL, supervised=True)
         risk = 100 * r["scores"][HYBRID]
         cut = band_cutoffs(val.is_scam.to_numpy(), r["val_scores"][HYBRID], r["thresholds"][HYBRID])
         reasons = rule_score(test, stage)[1]
@@ -77,11 +84,18 @@ def main():
         cols = pd.DataFrame({f"rule_{s}": r["scores"]["Rules"], f"anomaly_{s}": anomaly, f"risk_{s}": risk,
                              f"band_{s}": to_band(risk, cut), f"alert_{s}": risk >= cut["High"],
                              f"reasons_{s}": [" | ".join(x) for x in reasons]}, index=test.voucher_id)
+        # supervised upper bound, banded the same way (for comparison in the dashboard only)
+        sup = 100 * r["scores"][SUPERVISED]
+        sup_cut = band_cutoffs(val.is_scam.to_numpy(), r["val_scores"][SUPERVISED], r["thresholds"][SUPERVISED])
+        cols[f"sup_risk_{s}"] = sup
+        cols[f"sup_band_{s}"] = to_band(sup, sup_cut)
+        cols[f"sup_alert_{s}"] = sup >= sup_cut["High"]
         out = out.join(cols)
-        meta["stages"][stage] = {"hybrid_w": r["hybrids"][HYBRID]["w"], "cutoffs": cut}
+        meta["stages"][stage] = {"hybrid_w": r["hybrids"][HYBRID]["w"], "cutoffs": cut, "supervised_cutoffs": sup_cut}
         print(f"Stage {stage}: w={r['hybrids'][HYBRID]['w']}, cut-offs " +
               ", ".join(f"{k} {v:.1f}" for k, v in cut.items()))
         print(pd.crosstab(out[f"band_{s}"], out.is_scam).reindex(["Low", "Medium", "High", "Critical"]))
+        print("Supervised:", pd.crosstab(out[f"sup_band_{s}"], out.is_scam).reindex(["Low", "Medium", "High", "Critical"]))
 
     out.reset_index().to_csv(f"{a.data}/scored_vouchers.csv", index=False)
     with open(f"{a.data}/dashboard_meta.json", "w") as f:

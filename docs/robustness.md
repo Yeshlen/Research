@@ -1,7 +1,7 @@
 # Robustness and Sensitivity (dataset v1.1)
 
-Regenerate with `python src/experiments.py` (~10 min; it needs the extra datasets below first).
-Figures: `report/figures/learning_curve`, `sensitivity`. Tables: `report/tables/bootstrap_ci.csv`, `learning_curve.csv`, `robustness.csv`, `prevalence.csv`, `rule_ablation.csv`.
+Regenerate with `python src/experiments.py` (~25 min; it needs the extra datasets below first).
+Figures: `report/figures/learning_curve`, `sensitivity`, `label_budget`. Tables: `report/tables/bootstrap_ci.csv`, `learning_curve.csv`, `robustness.csv`, `prevalence.csv`, `rule_ablation.csv`, `label_budget.csv`.
 
 Extra datasets for the dataset-seed check (not committed):
 ```bash
@@ -12,10 +12,10 @@ Both pass all constraint checks. Their "too easy" tree PR-AUC is 0.12–0.17 (A)
 ## 1. Are the differences real? Bootstrap 95% intervals
 Test customers are resampled 200 times; whole customers are resampled because their vouchers are correlated.
 
-| Stage | Rules | Isolation Forest | One-Class SVM | Rules + IF | **Rules + OCSVM** |
-|---|---|---|---|---|---|
-| A | 0.30 [0.27, 0.33] | 0.30 [0.26, 0.33] | 0.28 [0.25, 0.32] | 0.36 [0.32, 0.39] | **0.42 [0.39, 0.46]** |
-| B | 0.42 [0.39, 0.45] | 0.28 [0.25, 0.32] | 0.29 [0.26, 0.32] | 0.48 [0.45, 0.52] | **0.51 [0.47, 0.55]** |
+| Stage | Rules | Isolation Forest | One-Class SVM | Rules + IF | **Rules + OCSVM** | *Supervised (labels)* |
+|---|---|---|---|---|---|---|
+| A | 0.30 [0.27, 0.33] | 0.30 [0.26, 0.33] | 0.28 [0.25, 0.32] | 0.36 [0.32, 0.39] | **0.42 [0.39, 0.46]** | *0.81 [0.79, 0.83]* |
+| B | 0.42 [0.38, 0.45] | 0.28 [0.25, 0.32] | 0.29 [0.26, 0.33] | 0.48 [0.45, 0.52] | **0.51 [0.48, 0.54]** | *0.93 [0.92, 0.94]* |
 
 At stage A, Rules + OCSVM's interval does not overlap with any single model's. At stage B, Rules + OCSVM and Rules + IF overlap with each other, but both sit clearly above every single model. The autoencoder (0.06 [0.05, 0.08]) is clearly worst.
 
@@ -53,8 +53,8 @@ Real cardless scam prevalence is unknown and probably below the simulated 1.4%. 
 | Prevalence | Rules precision (A / B) | Rules + OCSVM precision (A / B) | Rules + OCSVM recall |
 |---|---|---|---|
 | 1.4% | 0.51 / 0.64 | 0.46 / 0.56 | 0.54 |
-| 1.0% | 0.43 / 0.55 | 0.38 / 0.47 | 0.53–0.54 |
-| 0.5% | 0.28 / 0.38 | 0.23 / 0.31 | 0.54–0.55 |
+| 1.0% | 0.43 / 0.55 | 0.38 / 0.47 | 0.54–0.55 |
+| 0.5% | 0.28 / 0.38 | 0.23 / 0.31 | 0.54 |
 | 0.1% | 0.07 / 0.11 | 0.06 / 0.08 | 0.53–0.54 |
 
 Recall and ROC-AUC do not depend on prevalence, but precision falls roughly in proportion to it. At 0.1%, about 1 alert in 12 is a scam. This is the base-rate effect every fraud system faces. It supports treating a High score as a **step-up** (call-back, cooling-off delay, in-app warning) rather than a block, and it is why the report should quote PR-AUC and precision alongside ROC-AUC. The hybrid's extra recall comes at slightly lower precision than the rules at the same prevalence.
@@ -66,8 +66,19 @@ Recall and ROC-AUC do not depend on prevalence, but precision falls roughly in p
   - `new_recipient` (+0.07) and `recipient_added_now` (+0.03) *hurt*. They fire on 68% of scams but also on 24–27% of legitimate vouchers, because people often send to new people. At 20 and 10 points they push too many legitimate vouchers up the ranking. `far_cashout` adds nothing (fires on 44% of legitimate cash-outs).
   - **Report wording:** the weights were set a priori from published scam descriptions and were deliberately *not* changed after seeing these test-set results, since that would leak test information. Learning the weights on the validation slice (for example, a logistic regression on rule hits) is listed as future work.
 
+## 7. How many confirmed scams would supervised learning need? (label budget)
+The supervised benchmark (`docs/model_results.md`) was retrained with only *n* confirmed scam vouchers from days 0–89. All other scams stayed labelled legitimate, as unreported cases would in a bank (3 random draws per *n*).
+
+| Confirmed scams | 10 | 25 | 50 | 100 | 250 | 500 | all (1,065) |
+|---|---|---|---|---|---|---|---|
+| Supervised PR-AUC, A | 0.03 | 0.07 | 0.16 | 0.28 | 0.54 | 0.71 | 0.81 |
+| Supervised PR-AUC, B | 0.03 | 0.06 | 0.16 | 0.36 | 0.71 | 0.85 | 0.93 |
+
+The label-free hybrid scores 0.42 (A) and 0.51 (B). **Supervised learning only overtakes it after about 150–200 confirmed scam vouchers.** With fewer, it is worse than the hybrid, and with under 50 it is close to useless. This is the strongest argument for the proposed design. A bank launching scam detection for a new product or a new scam script should start with rules plus anomaly detection, then move to (or blend in) a supervised model once enough cases are confirmed. The dashboard's model switch shows both side by side.
+
 ## Summary for the report
 1. The hybrid's advantage holds under bootstrap intervals, refitting with other model seeds, regenerated datasets and removal of the main assumed signal.
 2. The unsupervised models need only a few thousand vouchers to train. Dataset size matters for reliable evaluation of a 1% class.
 3. Precision depends on the real scam prevalence. At realistic rates, alerts should trigger friction, not blocks.
 4. The hand-set rule weights are a weak point: two "new recipient" rules are too noisy at their current weights.
+5. With labels, the same features reach PR-AUC 0.81–0.93, but only after about 150–200 confirmed scams. Below that, the label-free hybrid is the better choice.

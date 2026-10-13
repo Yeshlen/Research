@@ -78,15 +78,23 @@ truth = st.sidebar.toggle("Show ground truth (evaluation mode)", value=True,
 days = sorted(v.day.unique())
 day = st.sidebar.select_slider("Day", options=days, value=days[0],
                                format_func=lambda d: (START + pd.Timedelta(days=int(d))).strftime("%a %d %b %Y"))
-cut = meta["stages"][stage.upper()]["cutoffs"]
+has_sup = f"sup_risk_{stage}" in v.columns
+model_choice = st.sidebar.radio(
+    "Scoring model", [meta["model"] + " (no labels)"] + (["Supervised GBM (needs labels)"] if has_sup else []),
+    help="The proposed system needs no confirmed scams. The supervised model is an upper-bound benchmark: "
+         "it shows what the same features achieve once a bank has labelled scams to learn from.")
+supervised = model_choice.startswith("Supervised")
+cut = meta["stages"][stage.upper()]["supervised_cutoffs" if supervised else "cutoffs"]
 st.sidebar.caption(
-    f"Model: {meta['model']} (w = {meta['stages'][stage.upper()]['hybrid_w']}). "
-    f"Bands on the 0–100 risk score: Medium ≥ {cut['Medium']:.1f}, High ≥ {cut['High']:.1f}, "
+    (f"Model: supervised gradient boosting trained on labelled scams (benchmark only). " if supervised else
+     f"Model: {meta['model']} (w = {meta['stages'][stage.upper()]['hybrid_w']}). ")
+    + f"Bands on the 0–100 risk score: Medium ≥ {cut['Medium']:.1f}, High ≥ {cut['High']:.1f}, "
     f"Critical ≥ {cut['Critical']:.1f}. High and Critical raise an alert. Fitted on days 0–89, tuned on "
     "days 90–119, never on the days shown here.")
 
 scored = v if stage == "a" else v[v.redeemed == 1]
-risk, band, alert, reasons = f"risk_{stage}", f"band_{stage}", f"alert_{stage}", f"reasons_{stage}"
+pre = "sup_" if supervised else ""
+risk, band, alert, reasons = f"{pre}risk_{stage}", f"{pre}band_{stage}", f"{pre}alert_{stage}", f"reasons_{stage}"
 scored = scored.assign(**{alert: scored[alert].astype(bool)})
 scored["caught"] = scored.is_scam.astype(bool) & scored[alert]
 today = scored[scored.day == day]

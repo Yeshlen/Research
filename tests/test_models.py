@@ -63,3 +63,11 @@ def test_dashboard_band_cutoffs_are_ordered():
     assert cut["Medium"] <= cut["High"] == 70 <= cut["Critical"]
     assert list(to_band(np.array([0, cut["Medium"], cut["High"], cut["Critical"]]), cut)) == \
         ["Low", "Medium", "High", "Critical"]
+
+
+def test_supervised_benchmark_learns(df):
+    from models import supervised_gbm
+    train, test = df[df.split == "train"], df[df.split == "test"]
+    s = supervised_gbm(STAGE_A_FEATURES).fit(train).score(test)
+    assert s.min() >= 0 and s.max() <= 1
+    assert s[test.is_scam.to_numpy() == 1].mean() > s[test.is_scam.to_numpy() == 0].mean()
