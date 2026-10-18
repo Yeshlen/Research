@@ -1,0 +1,22 @@
+% Scam types and red-flag probabilities. Needs: \usepackage{booktabs,tabularx,array,makecell}
+\begin{table}[htbp]
+\centering
+\small
+\caption{Scam scenario types and the probability that each red flag was present in an episode. No scenario type always showed every red flag, so detection required a combination of signals. The weight is each type's share of scam episodes.}
+\label{tab:scam-flags}
+\begin{tabularx}{\textwidth}{lccccc>{\raggedright\arraybackslash}X}
+\toprule
+Scenario & Weight & \makecell{New\\recipient} & \makecell{High\\amount} & \makecell{Limit\\raised} & \makecell{Fast\\cash-out} & Description \\
+\midrule
+Classic     & 30\% & 0.90 & 0.80 & 0.30 & 0.85 & Told to ``move money to safety'' to a new number, close to the limit \\
+Self-send   & 20\% & --\textsuperscript{a} & 0.70 & 0.30 & 0.85 & Sends the voucher to own number and reads back the PIN \\
+Limit raise & 20\% & 0.80 & 0.90 & 1.00 & 0.80 & First coached to raise the daily limit \\
+Split       & 15\% & 0.85 & --\textsuperscript{b} & 0.50 & 0.80 & Two to four smaller vouchers in one session \\
+Subtle      & 15\% & 0.50 & --\textsuperscript{b} & 0.00 & 0.40 & About twice the usual amount; few other flags \\
+\bottomrule
+\end{tabularx}
+\par\smallskip\raggedright\footnotesize
+\textsuperscript{a} Always sent to the victim's own number.
+\textsuperscript{b} Smaller amounts by design: about 30\% of the limit per voucher (split) or about twice the usual amount (subtle).
+All scam types: 92\% created between 08:00 and 19:00; 5\% preceded by a device change; 45\% coached (long session, many screens) and 55\% rushed; fast cash-out median 10 minutes, otherwise 60 minutes; 50\% cashed out in another metro.
+\end{table}
