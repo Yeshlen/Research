@@ -1,15 +1,17 @@
 """
 Cardless withdrawal risk monitoring dashboard (prototype).
 
-Replays the test period (days 120-179) as a bank analyst would see it: the alert queue for a chosen day,
-each alert's risk band and reasons, a drill-down into the customer's recent behaviour, and how the model
-performs. Scores come from the Rules + One-Class SVM hybrid (src/score_all.py), which was fitted and tuned
+Replays the test period (days 120-179) as a bank's fraud desk would see it: a live alert feed that plays a
+chosen day back in accelerated time, scoring each voucher when it is created and again when someone tries to
+cash it out; the alert queue for the day, each alert's risk band and reasons; a drill-down into the customer's
+recent behaviour; and how the model performs. Scores come from the Rules + One-Class SVM hybrid (src/score_all.py), which was fitted and tuned
 only on earlier days.
 
 Run:
     python src/score_all.py          # once, after generating the dataset
     streamlit run app/dashboard.py
 """
+import html
 import json
 import os
 
@@ -27,6 +29,13 @@ BANDS = ["Low", "Medium", "High", "Critical"]
 BAND_COLOR = {"Low": "#898781", "Medium": "#fab219", "High": "#ec835a", "Critical": "#d03b3b"}
 BAND_ICON = {"Low": "○", "Medium": "◐", "High": "●", "Critical": "▲"}
 LEGIT, SCAM = "#2a78d6", "#eb6834"
+SPEEDS = {"5 min / s": 5, "15 min / s": 15, "30 min / s": 30, "1 hour / s": 60}
+ACTION = {("a", "Critical"): "Voucher frozen. The PIN is not released until the customer confirms on a call "
+                             "from the bank.",
+          ("a", "High"): "In-app scam warning shown, with a 30-minute cooling-off before the PIN can be shared.",
+          ("b", "Critical"): "Cash-out blocked at the ATM or till. The customer is called back.",
+          ("b", "High"): "Step-up check: the customer must approve the cash-out in the app before cash is "
+                         "dispensed."}
 EVENT_LABEL = {"login": "Login", "add_recipient": "Recipient added", "change_limit": "Daily limit changed",
                "device_registered": "New device registered", "password_reset": "Password reset",
                "create_voucher": "Voucher created", "redeem_voucher": "Voucher cashed out", "logout": "Logout"}
@@ -99,7 +108,113 @@ scored = scored.assign(**{alert: scored[alert].astype(bool)})
 scored["caught"] = scored.is_scam.astype(bool) & scored[alert]
 today = scored[scored.day == day]
 
-tab_queue, tab_customer, tab_model = st.tabs(["Alert queue", "Customer drill-down", "Model performance"])
+tab_live, tab_queue, tab_customer, tab_model = st.tabs(["Live alerts", "Alert queue", "Customer drill-down",
+                                                        "Model performance"])
+
+
+# ---------------------------------------------------------------- live replay
+@st.cache_data
+def day_stream(day, pre):
+    """Every scoring event of one day in time order: stage A when a voucher is created, stage B at cash-out."""
+    d = v[v.day == day]
+    parts = []
+    for s_, when, rows in [("a", "created_at", d), ("b", "redeemed_at", d[d.redeemed == 1])]:
+        parts.append(pd.DataFrame({
+            "time": rows[when], "stage": s_, "voucher_id": rows.voucher_id, "customer_id": rows.customer_id,
+            "amount": rows.amount, "risk": rows[f"{pre}risk_{s_}"], "band": rows[f"{pre}band_{s_}"],
+            "alert": rows[f"{pre}alert_{s_}"].astype(bool), "reasons": rows[f"reasons_{s_}"].fillna(""),
+            "dist_km": rows.redeem_dist_usual_km, "scenario": rows.scenario_type, "is_scam": rows.is_scam}))
+    ev = pd.concat(parts).sort_values("time", kind="stable").reset_index(drop=True)
+    ev["minute"] = (ev.time - (START + pd.Timedelta(days=int(day)))).dt.total_seconds() / 60
+    return ev
+
+
+def alert_card(e):
+    color = BAND_COLOR[e.band]
+    what = "Voucher created" if e.stage == "a" else f"Cash-out attempt, {e.dist_km:.0f} km from usual area"
+    reasons = "".join(f"<li>{html.escape(r_)}</li>" for r_ in e.reasons.split(" | ") if r_)
+    truth_tag = ""
+    if truth:
+        ok = bool(e.is_scam)
+        truth_tag = (f"<span style='float:right;font-size:0.8em;padding:1px 8px;border-radius:9px;"
+                     f"border:1px solid {SCAM if ok else LEGIT};color:{SCAM if ok else LEGIT}'>"
+                     f"{'scam' if ok else 'legitimate'}: {html.escape(e.scenario.replace('_', ' '))}</span>")
+    return (f"<div style='border-left:6px solid {color};background:rgba(128,128,128,0.08);border-radius:6px;"
+            f"padding:10px 14px;margin-bottom:10px'>{truth_tag}"
+            f"<div style='font-weight:600'><span style='color:{color}'>{BAND_ICON[e.band]} {e.band.upper()}</span>"
+            f" · {e.time:%H:%M} · {what}</div>"
+            f"<div style='font-size:0.9em;opacity:0.85'>Voucher {e.voucher_id} · customer {e.customer_id} · "
+            f"R{e.amount:,.0f} · risk {e.risk:.1f}</div>"
+            f"<ul style='margin:6px 0 4px 0;font-size:0.9em'>{reasons or '<li>unusual overall pattern</li>'}</ul>"
+            f"<div style='font-size:0.9em'><b>Action:</b> {ACTION[(e.stage, e.band)]}</div></div>")
+
+
+with tab_live:
+    stream = day_stream(day, pre)
+    key = (day, pre)
+    if st.session_state.get("replay_key") != key:
+        st.session_state.update(replay_key=key, clock=0.0, running=False)
+    end = float(stream.minute.max()) + 1
+    b = st.columns([1, 1, 1, 1.4, 3])
+    if b[0].button("⏸ Pause" if st.session_state.running else "▶ Play", use_container_width=True):
+        st.session_state.running = not st.session_state.running
+        st.rerun()
+    if b[1].button("⏭ Next alert", use_container_width=True,
+                   help="Jump the clock to the next alert after the current time."):
+        nxt = stream[stream.alert & (stream.minute > st.session_state.clock)]
+        st.session_state.clock = float(nxt.minute.iloc[0]) if len(nxt) else end
+    if b[2].button("↺ Restart", use_container_width=True):
+        st.session_state.update(clock=0.0, running=False)
+    speed = SPEEDS[b[3].selectbox("Speed", list(SPEEDS), index=2, label_visibility="collapsed")]
+    lat = meta["stages"]["A"].get("latency_ms")
+    b[4].caption(f"Plays {START + pd.Timedelta(days=int(day)):%a %d %b %Y} back in accelerated time. Each voucher is "
+                 "scored when it is created (stage A) and again at cash-out (stage B)."
+                 + (f" Scoring one voucher takes about {lat['p50']:.0f} ms." if lat else ""))
+
+    @st.fragment(run_every=1.0 if st.session_state.running else None)
+    def live_panel():
+        if st.session_state.running:
+            st.session_state.clock = min(st.session_state.clock + speed, end)
+            if st.session_state.clock >= end:
+                st.session_state.running = False
+        now = st.session_state.clock
+        seen = stream[stream.minute <= now]
+        raised = seen[seen.alert]
+        clock = START + pd.Timedelta(days=int(day), minutes=now)
+        st.progress(min(now / end, 1.0), text=f"🕒 {clock:%H:%M}  ·  {len(seen):,} of {len(stream):,} events scored")
+        c = st.columns(5 if truth else 4)
+        c[0].metric("Vouchers created", f"{(seen.stage == 'a').sum():,}")
+        c[1].metric("Cash-out attempts", f"{(seen.stage == 'b').sum():,}")
+        c[2].metric("Alerts raised", f"{len(raised):,}",
+                    f"{(raised.band == 'Critical').sum()} critical", delta_color="off", delta_arrow="off")
+        c[3].metric("Amount held or blocked", f"R{raised.drop_duplicates('voucher_id').amount.sum():,.0f}")
+        if truth:
+            scam_v = seen[seen.is_scam == 1].voucher_id.unique()
+            hit = raised[raised.is_scam == 1].voucher_id.unique()
+            c[4].metric("Scams flagged so far", f"{len(hit)} of {len(scam_v)}",
+                        f"{raised.is_scam.mean():.0%} of alerts are scams" if len(raised) else "no alerts yet",
+                        delta_color="off", delta_arrow="off")
+        left, right = st.columns([3, 2])
+        with left:
+            st.markdown("**Alerts, newest first**")
+            if raised.empty:
+                st.info("No alerts yet. Press Play or Next alert.")
+            for e in raised.iloc[::-1].head(6).itertuples():
+                st.markdown(alert_card(e), unsafe_allow_html=True)
+        with right:
+            st.markdown("**Live scoring feed**")
+            feed = seen.iloc[::-1].head(14)
+            st.dataframe(pd.DataFrame({
+                "Time": feed.time.dt.strftime("%H:%M"),
+                "Event": feed.stage.map({"a": "Created", "b": "Cash-out"}),
+                "Amount (R)": feed.amount.astype(int),
+                "Risk": feed.risk.round(1),
+                "Band": feed.band.map(band_label),
+            }), hide_index=True, use_container_width=True, height=525,
+                column_config={"Risk": st.column_config.ProgressColumn("Risk", min_value=0, max_value=100,
+                                                                       format="%.1f", width="small")})
+
+    live_panel()
 
 # ---------------------------------------------------------------- alert queue
 with tab_queue:
@@ -107,13 +222,13 @@ with tab_queue:
     c = st.columns(4 if truth else 3)
     c[0].metric("Vouchers scored", f"{len(today):,}")
     c[1].metric("Alerts (High + Critical)", f"{len(alerts):,}", f"{len(alerts) / max(len(today), 1):.1%} of vouchers",
-                delta_color="off")
+                delta_color="off", delta_arrow="off")
     c[2].metric("Amount under alert", f"R{alerts.amount.sum():,.0f}")
     if truth:
         caught, scams = int(alerts.is_scam.sum()), int(today.is_scam.sum())
         c[3].metric("Scams caught", f"{caught} of {scams}",
                     f"{caught / len(alerts):.0%} of alerts are scams" if len(alerts) else "no alerts",
-                    delta_color="off")
+                    delta_color="off", delta_arrow="off")
 
     # daily trend over the replay window
     daily = scored.groupby("day").agg(alerts=(alert, "sum"), scams=("is_scam", "sum"), caught=("caught", "sum"))

@@ -48,13 +48,14 @@ All parameters live in `config/generator.yaml`; the same seed gives the same dat
 - [x] LOF, One-Class SVM, autoencoder and their hybrids
 - [x] Supervised upper-bound benchmark and label-budget curve
 - [x] Learning curve and sensitivity analysis (`docs/robustness.md`)
-- [x] Dashboard (`app/dashboard.py`): alert queue with risk bands and reasons, customer drill-down, model performance
+- [x] Dashboard (`app/dashboard.py`): live alert replay, alert queue with risk bands and reasons, customer drill-down, model performance
 - [ ] Report
 
 ## Dashboard
 
 `streamlit run app/dashboard.py` replays the test period (days 120–179) as a bank analyst would see it:
 
+- **Live alerts:** plays the chosen day back in accelerated time (5 minutes to 1 hour per second). Each voucher is scored when it is created and again when someone tries to cash it out. An alert card appears the moment a score crosses the threshold, showing the band, the reasons and the bank's action (freeze the PIN, cooling-off warning, block the cash-out, or step-up approval in the app). Play, pause, restart and "next alert" controls drive the demo. Scoring one voucher takes about 12–15 ms (measured by `score_all.py`), so the system can score in real time.
 - **Alert queue:** choose a day and a scoring point (creation or cash-out) to see that day's alerts. Each shows its risk score, its Low/Medium/High/Critical band and the reasons it was flagged. An evaluation toggle reveals which alerts were real scams.
 - **Customer drill-down:** a customer's vouchers coloured by band, plus their recent account events (limit changes, new devices, new recipients, cash-outs).
 - **Model switch:** the label-free Rules + OCSVM system, or the supervised benchmark for comparison.

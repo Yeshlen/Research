@@ -11,6 +11,8 @@ Band cut-offs on the 0-100 risk score (= 100 x hybrid score), all set on validat
   Critical -> lowest score where validation precision reaches 70%
   (raised to 10 points above the alert threshold's own recall / precision when it already exceeds them)
 
+Also times scoring one voucher at a time (stored in the metadata as latency_ms) to back the real-time claim.
+
 Writes data/synthetic/scored_vouchers.csv, data/synthetic/customer_events_test.parquet and
 data/synthetic/dashboard_meta.json.
 
@@ -21,6 +23,7 @@ import argparse
 import json
 import os
 import sys
+import time
 
 import numpy as np
 import pandas as pd
@@ -28,7 +31,7 @@ from sklearn.metrics import precision_recall_curve
 
 sys.path.insert(0, os.path.dirname(__file__))
 from evaluate import SUPERVISED, score_stage, split_stage  # noqa: E402
-from models import one_class_svm, rule_score  # noqa: E402
+from models import STAGE_A_FEATURES, STAGE_B_FEATURES, hybrid_score, one_class_svm, rule_score  # noqa: E402
 
 MODEL = {"One-Class SVM": ("OCSVM", lambda f, seed, nu: one_class_svm(f, nu, seed), [0.1])}
 HYBRID = "Rules + OCSVM"
@@ -49,6 +52,22 @@ def band_cutoffs(y, s, threshold):
     medium = min(medium, threshold)
     critical = max(critical, threshold)
     return {"Medium": 100 * float(medium), "High": 100 * float(threshold), "Critical": 100 * float(critical)}
+
+
+def scoring_latency(fit, test, stage, w, n=300, seed=0):
+    """Time scoring vouchers one at a time (rules + anomaly model + blend), as a live system would.
+
+    Returns the median and 95th percentile in milliseconds per voucher.
+    """
+    scorer = one_class_svm(STAGE_A_FEATURES if stage == "A" else STAGE_B_FEATURES, 0.1, seed).fit(fit)
+    rows = test.sample(n, random_state=seed)
+    ms = []
+    for i in range(n):
+        row = rows.iloc[[i]]
+        t0 = time.perf_counter()
+        hybrid_score(rule_score(row, stage)[0], scorer.score(row), w)
+        ms.append(1000 * (time.perf_counter() - t0))
+    return {"p50": float(np.percentile(ms, 50)), "p95": float(np.percentile(ms, 95))}
 
 
 def to_band(score, cut):
@@ -91,7 +110,10 @@ def main():
         cols[f"sup_band_{s}"] = to_band(sup, sup_cut)
         cols[f"sup_alert_{s}"] = sup >= sup_cut["High"]
         out = out.join(cols)
-        meta["stages"][stage] = {"hybrid_w": r["hybrids"][HYBRID]["w"], "cutoffs": cut, "supervised_cutoffs": sup_cut}
+        lat = scoring_latency(fit, test, stage, r["hybrids"][HYBRID]["w"])
+        meta["stages"][stage] = {"hybrid_w": r["hybrids"][HYBRID]["w"], "cutoffs": cut, "supervised_cutoffs": sup_cut,
+                                 "latency_ms": lat}
+        print(f"Stage {stage}: one voucher scores in {lat['p50']:.1f} ms (median), {lat['p95']:.1f} ms (95th pct)")
         print(f"Stage {stage}: w={r['hybrids'][HYBRID]['w']}, cut-offs " +
               ", ".join(f"{k} {v:.1f}" for k, v in cut.items()))
         print(pd.crosstab(out[f"band_{s}"], out.is_scam).reindex(["Low", "Medium", "High", "Critical"]))
