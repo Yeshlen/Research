@@ -18,3 +18,9 @@ report/*.out
 report/*.toc
 report/*.synctex.gz
 data/*.log
+report/latex/*.aux
+report/latex/*.log
+report/latex/*.bbl
+report/latex/*.blg
+report/latex/*.out
+report/latex/preview.pdf

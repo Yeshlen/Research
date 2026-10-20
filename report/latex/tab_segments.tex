@@ -1,0 +1,17 @@
+% Customer segments. Needs: \usepackage{booktabs,makecell}
+\begin{table}[htbp]
+\centering
+\small
+\caption{Customer segments used by the simulator. Values are segment medians; each customer's own voucher rate and typical amount were drawn around them with log-normal spread ($\sigma = 1.0$ and $\sigma = 0.5$), which produced a long-tailed activity distribution. Shares and values are modelling assumptions.}
+\label{tab:segments}
+\begin{tabular}{lcccc}
+\toprule
+Segment & \makecell{Share of\\customers} & \makecell{Vouchers\\per month} & \makecell{Typical\\amount (R)} & \makecell{App sessions\\per month} \\
+\midrule
+Student          & 20\% & 0.5 & 300 & 10 \\
+Salaried         & 45\% & 0.8 & 800 & 14 \\
+Informal income  & 20\% & 1.2 & 600 & 8 \\
+Pensioner        & 15\% & 0.4 & 500 & 5 \\
+\bottomrule
+\end{tabular}
+\end{table}
