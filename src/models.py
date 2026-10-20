@@ -1,6 +1,5 @@
 """
-Risk scoring models: rule-based heuristic scoring, unsupervised anomaly scoring (Isolation Forest, LOF,
-One-Class SVM, autoencoder), and a hybrid of rules and one anomaly model.
+Risk scoring models: rule-based heuristic scoring and anomaly scoring (Isolation Forest, LOF, One-Class SVM), and a hybrid of rules and one anomaly model.
 
 Every scorer returns a score where higher means riskier. Rule scores are 0-100 with human-readable
 alert reasons. Anomaly scores are converted to a 0-1 percentile against the training data, so both
@@ -8,9 +7,8 @@ can be combined on the same scale.
 """
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import HistGradientBoostingClassifier, IsolationForest
+from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import LocalOutlierFactor
-from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import OneClassSVM
 
@@ -94,7 +92,7 @@ def model_matrix(df, features):
 class PercentileScorer:
     """Wraps an unsupervised model so scores become 'share of training rows less anomalous than this one'.
 
-    scale: standardise features first (needed by distance and neural models).
+    scale: standardise features first (needed by distance-based models).
     max_fit: fit on a random subsample of this size (LOF and OCSVM scale badly with n);
     the percentile reference still uses every training row.
     """
@@ -126,19 +124,6 @@ class PercentileScorer:
         return np.searchsorted(self.ref, self.raw(df)) / len(self.ref)
 
 
-class Autoencoder:
-    """Under-complete MLP autoencoder; score_samples is minus the mean squared reconstruction error."""
-
-    def __init__(self, hidden=(32, 8, 32), epochs=40, seed=0):
-        self.net = MLPRegressor(hidden_layer_sizes=hidden, max_iter=epochs, batch_size=256, random_state=seed)
-
-    def fit(self, X):
-        self.net.fit(X, X)
-        return self
-
-    def score_samples(self, X):
-        return -((self.net.predict(X) - X) ** 2).mean(axis=1)
-
 
 def isolation_forest(features, seed=0):
     return PercentileScorer(IsolationForest(n_estimators=300, max_samples=256, random_state=seed, n_jobs=-1),
@@ -154,33 +139,6 @@ def one_class_svm(features, nu=0.05, seed=0):
     return PercentileScorer(OneClassSVM(kernel="rbf", nu=nu, gamma="scale"),
                             distance_features(features), scale=True, max_fit=10000, seed=seed)
 
-
-def autoencoder(features, seed=0):
-    return PercentileScorer(Autoencoder(seed=seed), distance_features(features), scale=True, seed=seed)
-
-
-# ---------------------------------------------------------------- supervised benchmark
-class SupervisedScorer:
-    """Gradient-boosted trees trained WITH the scam labels.
-
-    Not part of the proposed system (banks rarely have confirmed vishing labels at the start); it is an
-    upper-bound benchmark showing what the same features achieve once labelled scams are available.
-    """
-
-    def __init__(self, features, seed=0):
-        self.features = features
-        self.model = HistGradientBoostingClassifier(max_iter=300, learning_rate=0.05, random_state=seed)
-
-    def fit(self, df):
-        self.model.fit(model_matrix(df, self.features), df.is_scam.to_numpy())
-        return self
-
-    def score(self, df):
-        return self.model.predict_proba(model_matrix(df, self.features))[:, 1]
-
-
-def supervised_gbm(features, seed=0):
-    return SupervisedScorer(features, seed)
 
 
 # ---------------------------------------------------------------- hybrid

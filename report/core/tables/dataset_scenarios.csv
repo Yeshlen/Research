@@ -1,0 +1,10 @@
+scenario_type,is_scam,vouchers
+legit_emergency,0,783
+legit_new_phone,0,1557
+legit_travel,0,855
+normal,0,210191
+scam_classic,1,653
+scam_limit_raise,1,425
+scam_self_send,1,447
+scam_split,1,904
+scam_subtle,1,332

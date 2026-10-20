@@ -1,0 +1,21 @@
+check,violations
+amount not a multiple of step,0
+amount not positive,0
+amount above max daily limit,0
+amount above current limit,0
+calendar-day total above max limit,0
+calendar-month total above limit,0
+redeemed but no delay,0
+not redeemed but has delay,0
+negative redemption delay,0
+redeemed after expiry,0
+recipient known with no history,0
+self-send flagged as added recipient,0
+voucher before account opened,0
+missing label,0
+invalid label,0
+duplicate voucher features,0
+duplicate truth vouchers,0
+voucher IDs absent from truth,0
+truth vouchers absent from features,0
+labels different from truth,0

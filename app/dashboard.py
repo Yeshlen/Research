@@ -1,260 +1,119 @@
-"""
-Cardless withdrawal risk monitoring dashboard (prototype).
-
-Replays the test period (days 120-179) as a bank analyst would see it: the alert queue for a chosen day,
-each alert's risk band and reasons, a drill-down into the customer's recent behaviour, and how the model
-performs. Scores come from the Rules + One-Class SVM hybrid (src/score_all.py), which was fitted and tuned
-only on earlier days.
-
-Run:
-    python src/score_all.py          # once, after generating the dataset
-    streamlit run app/dashboard.py
-"""
+"""Historical replay prototype showing the notebook-generated core evaluation."""
+from pathlib import Path
 import json
-import os
+import sys
 
-import altair as alt
 import pandas as pd
 import streamlit as st
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(ROOT, "data", "synthetic")
-REPORT = os.path.join(ROOT, "report")
-START = pd.Timestamp("2025-07-01")
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'src'))
+from core_evaluation import fingerprint
 
-BANDS = ["Low", "Medium", "High", "Critical"]
-# status palette (dataviz reference): never reused for series, always shown with a label
-BAND_COLOR = {"Low": "#898781", "Medium": "#fab219", "High": "#ec835a", "Critical": "#d03b3b"}
-BAND_ICON = {"Low": "○", "Medium": "◐", "High": "●", "Critical": "▲"}
-LEGIT, SCAM = "#2a78d6", "#eb6834"
-EVENT_LABEL = {"login": "Login", "add_recipient": "Recipient added", "change_limit": "Daily limit changed",
-               "device_registered": "New device registered", "password_reset": "Password reset",
-               "create_voucher": "Voucher created", "redeem_voucher": "Voucher cashed out", "logout": "Logout"}
-
-st.set_page_config(page_title="Cardless Risk Monitor", page_icon="🛡️", layout="wide")
-
-
-@st.cache_data
-def load():
-    v = pd.read_csv(os.path.join(DATA, "scored_vouchers.csv"), parse_dates=["created_at", "redeemed_at"])
-    cust = pd.read_csv(os.path.join(DATA, "customers.csv")).set_index("customer_id")
-    with open(os.path.join(DATA, "dashboard_meta.json")) as f:
-        meta = json.load(f)
-    return v, cust, meta
-
-
-@st.cache_data
-def customer_events(customer_id):
-    ev = pd.read_parquet(os.path.join(DATA, "customer_events_test.parquet"),
-                         filters=[("customer_id", "==", customer_id)])
-    ev["time"] = START + pd.to_timedelta(ev.t_min, unit="min")
-    return ev
-
-
-def band_label(b):
-    return f"{BAND_ICON[b]} {b}"
-
-
-def band_scale():
-    return alt.Scale(domain=BANDS, range=[BAND_COLOR[b] for b in BANDS])
-
-
-if not os.path.exists(os.path.join(DATA, "scored_vouchers.csv")):
-    st.error("No scores found. Run `python src/simulate.py`, `python src/features.py` and "
-             "`python src/score_all.py` first.")
+DATA = ROOT / 'data/synthetic'
+REPORT = ROOT / 'report/core'
+st.set_page_config(page_title='Cardless Risk Monitor', page_icon='🛡️', layout='wide')
+DISPLAY_NAMES = {'score_time': 'Scored at', 'created_at': 'Created at', 'redeemed_at': 'Cashed out at',
+                 'voucher_id': 'Voucher', 'customer_id': 'Customer', 'amount': 'Amount (R)', 'risk': 'Risk score',
+                 'band': 'Band', 'alert': 'Alert', 'rule_indicators': 'Rule indicators',
+                 'scenario_type': 'Simulation scenario', 'is_scam': 'Simulated scam',
+                 'event_time': 'Event time', 'event_type': 'Event', 'new_limit': 'New limit (R)', 'channel': 'Channel'}
+required = [DATA/'core_scored_vouchers.csv', DATA/'core_dashboard_meta.json', REPORT/'tables/model_comparison.csv']
+if not all(p.exists() for p in required):
+    st.info('Run notebooks 01, 02 and 03 in order to prepare the dashboard results.')
     st.stop()
 
-v, customers, meta = load()
 
-# ---------------------------------------------------------------- sidebar
-st.sidebar.title("🛡️ Cardless Risk Monitor")
-stage_name = st.sidebar.radio("Scoring point", ["A: at voucher creation", "B: at cash-out"],
-                              help="Stage A scores when the voucher is created. Stage B re-scores it when "
-                                   "someone tries to cash it out, adding where and how fast that happens.")
-stage = stage_name[0].lower()
-truth = st.sidebar.toggle("Show ground truth (evaluation mode)", value=True,
-                          help="A real analyst would not see this. It shows which vouchers were scams in the "
-                               "simulation, so the alerts can be judged.")
-days = sorted(v.day.unique())
-day = st.sidebar.select_slider("Day", options=days, value=days[0],
-                               format_func=lambda d: (START + pd.Timedelta(days=int(d))).strftime("%a %d %b %Y"))
-has_sup = f"sup_risk_{stage}" in v.columns
-model_choice = st.sidebar.radio(
-    "Scoring model", [meta["model"] + " (no labels)"] + (["Supervised GBM (needs labels)"] if has_sup else []),
-    help="The proposed system needs no confirmed scams. The supervised model is an upper-bound benchmark: "
-         "it shows what the same features achieve once a bank has labelled scams to learn from.")
-supervised = model_choice.startswith("Supervised")
-cut = meta["stages"][stage.upper()]["supervised_cutoffs" if supervised else "cutoffs"]
-st.sidebar.caption(
-    (f"Model: supervised gradient boosting trained on labelled scams (benchmark only). " if supervised else
-     f"Model: {meta['model']} (w = {meta['stages'][stage.upper()]['hybrid_w']}). ")
-    + f"Bands on the 0–100 risk score: Medium ≥ {cut['Medium']:.1f}, High ≥ {cut['High']:.1f}, "
-    f"Critical ≥ {cut['Critical']:.1f}. High and Critical raise an alert. Fitted on days 0–89, tuned on "
-    "days 90–119, never on the days shown here.")
+@st.cache_data
+def load(signatures):
+    scores = pd.read_csv(required[0])
+    for column in ['created_at', 'redeemed_at', 'score_time']:
+        scores[column] = pd.to_datetime(scores[column], format='mixed')
+    meta = json.loads(required[1].read_text())
+    result = pd.read_csv(required[2])
+    if meta['fingerprint'] != fingerprint(ROOT):
+        raise ValueError('The saved results no longer match the data or fitting code. Run notebooks 02 and 03 again.')
+    return scores, meta, result
 
-scored = v if stage == "a" else v[v.redeemed == 1]
-pre = "sup_" if supervised else ""
-risk, band, alert, reasons = f"{pre}risk_{stage}", f"{pre}band_{stage}", f"{pre}alert_{stage}", f"reasons_{stage}"
-scored = scored.assign(**{alert: scored[alert].astype(bool)})
-scored["caught"] = scored.is_scam.astype(bool) & scored[alert]
-today = scored[scored.day == day]
 
-tab_queue, tab_customer, tab_model = st.tabs(["Alert queue", "Customer drill-down", "Model performance"])
+@st.cache_data(max_entries=12)
+def customer_events(customer_id, cutoff, signature):
+    """Read one customer's recent events without showing events after the chosen day."""
+    pieces = []
+    for chunk in pd.read_csv(DATA/'events_log.csv', chunksize=200000):
+        found = chunk[chunk.customer_id == customer_id].copy()
+        if not found.empty:
+            found['event_time'] = pd.Timestamp(meta['start_date']) + pd.to_timedelta(found.t_min, unit='min')
+            found = found[(found.event_time < cutoff) & (found.event_time >= cutoff-pd.Timedelta(days=7))]
+            found = found[found.event_type != 'view']
+            pieces.append(found)
+    if not pieces:
+        return pd.DataFrame()
+    return pd.concat(pieces).sort_values('event_time', ascending=False)
 
-# ---------------------------------------------------------------- alert queue
-with tab_queue:
-    alerts = today[today[alert]]
-    c = st.columns(4 if truth else 3)
-    c[0].metric("Vouchers scored", f"{len(today):,}")
-    c[1].metric("Alerts (High + Critical)", f"{len(alerts):,}", f"{len(alerts) / max(len(today), 1):.1%} of vouchers",
-                delta_color="off")
-    c[2].metric("Amount under alert", f"R{alerts.amount.sum():,.0f}")
+
+tracked = required + [DATA/'cardless_features.csv', ROOT/'config/generator.yaml', ROOT/'src/models.py',
+                      ROOT/'src/core_evaluation.py', ROOT/'notebooks/02_fit_models.ipynb']
+try:
+    vouchers, meta, results = load(tuple((str(p), p.stat().st_mtime_ns) for p in tracked))
+except ValueError as exc:
+    st.error(str(exc)); st.stop()
+
+stage_label = st.sidebar.radio('Scoring point', ['A: voucher creation', 'B: cash-out'])
+stage = stage_label[0]
+part = vouchers[vouchers.stage == stage].copy()
+selected = meta['stages'][stage]
+st.sidebar.caption(f"Model: {selected['model']}. Equal rule and anomaly weights.")
+st.sidebar.caption(f"Alerts start at {selected['cutoffs']['High']:.1f} on the 0–100 risk score. The score is not a fraud probability.")
+truth = st.sidebar.toggle('Show simulation ground truth', value=False)
+days = sorted(part.score_time.dt.date.unique())
+day = st.sidebar.select_slider('Scoring date', options=days, value=days[0])
+end = pd.Timestamp(day) + pd.Timedelta(days=1)
+today = part[part.score_time.dt.date == day]
+st.title('Cardless Risk Monitor')
+st.caption('Historical demonstration using saved notebook results. No transactions are blocked by this prototype.')
+queue, customer, performance = st.tabs(['Alert queue', 'Customer history', 'Model comparison'])
+with queue:
+    alerts = today[today.alert]
+    cols = st.columns(3)
+    cols[0].metric('Vouchers scored', len(today))
+    cols[1].metric('Alerts', len(alerts))
+    cols[2].metric('Amount under alert', f'R{alerts.amount.sum():,.0f}')
     if truth:
-        caught, scams = int(alerts.is_scam.sum()), int(today.is_scam.sum())
-        c[3].metric("Scams caught", f"{caught} of {scams}",
-                    f"{caught / len(alerts):.0%} of alerts are scams" if len(alerts) else "no alerts",
-                    delta_color="off")
-
-    # daily trend over the replay window
-    daily = scored.groupby("day").agg(alerts=(alert, "sum"), scams=("is_scam", "sum"), caught=("caught", "sum"))
-    daily["date"] = START + pd.to_timedelta(daily.index, unit="D")
-    series = {"Alerts raised": "alerts"} | ({"Scams caught": "caught"} if truth else {})
-    long = daily.reset_index().melt(id_vars=["day", "date"], value_vars=list(series.values()))
-    long["series"] = long.variable.map({v_: k for k, v_ in series.items()})
-    base = alt.Chart(long).encode(
-        x=alt.X("date:T", title=None),
-        y=alt.Y("value:Q", title="Vouchers per day"),
-        color=alt.Color("series:N", scale=alt.Scale(domain=list(series), range=[LEGIT, SCAM][:len(series)]),
-                        legend=alt.Legend(orient="top", title=None)),
-        tooltip=[alt.Tooltip("date:T", format="%a %d %b"), "series:N", alt.Tooltip("value:Q", title="vouchers")])
-    rule = alt.Chart(pd.DataFrame({"date": [START + pd.Timedelta(days=int(day))]})).mark_rule(
-        color="#52514e", strokeDash=[3, 3]).encode(x="date:T")
-    st.altair_chart((base.mark_line(strokeWidth=2) + base.mark_point(size=30, filled=True, opacity=0) + rule)
-                    .properties(height=180).interactive(bind_y=False), use_container_width=True)
-
-    st.subheader("Queue")
-    show = st.multiselect("Bands", BANDS, default=["Critical", "High"], format_func=band_label)
-    q = today[today[band].isin(show)].sort_values(risk, ascending=False)
-    time_col = "created_at" if stage == "a" else "redeemed_at"
-    table = pd.DataFrame({
-        "Time": q[time_col].dt.strftime("%H:%M"),
-        "Risk": q[risk].round(1),
-        "Band": q[band].map(band_label),
-        "Voucher": q.voucher_id.astype(str),
-        "Customer": q.customer_id.astype(str),
-        "Amount (R)": q.amount.astype(int),
-    })
-    if truth:
-        table["Truth"] = q.scenario_type.str.replace("_", " ")
-    table["Why it was flagged"] = q[reasons].fillna("").str.replace(" | ", " • ", regex=False)
-    st.dataframe(table, hide_index=True, use_container_width=True, height=420,
-                 column_config={"Risk": st.column_config.ProgressColumn("Risk", min_value=0, max_value=100,
-                                                                        format="%.1f", width="small"),
-                                "Why it was flagged": st.column_config.TextColumn(width="large")})
-    st.caption("Suggested handling: Critical → hold the voucher and call the customer back; High → in-app warning "
-               "and a short cooling-off delay; Medium → monitor. Most legitimate emergencies land in High, so a "
-               "step-up check suits them better than a block.")
-
-# ---------------------------------------------------------------- customer drill-down
-with tab_customer:
-    ranked = today.sort_values(risk, ascending=False).customer_id.drop_duplicates().tolist()
-    cid = st.selectbox("Customer (today's highest risk first)", ranked,
-                       format_func=lambda c_: f"{c_} — top risk today "
-                                              f"{today.loc[today.customer_id == c_, risk].max():.1f}")
-    prof = customers.loc[cid]
-    hist = v[v.customer_id == cid].sort_values("created_at")
-    c = st.columns(4)
-    c[0].metric("Home", prof.home_metro)
-    c[1].metric("Account opened", str(prof.account_open_date))
-    c[2].metric("Daily limit at start", f"R{prof.daily_limit_at_start:,}")
-    c[3].metric("Vouchers in test period", len(hist))
-
-    hb = hist.assign(Band=hist[f"band_{stage}"].fillna("Low"), risk=hist[f"risk_{stage}"].round(1),
-                     truth=hist.scenario_type.str.replace("_", " "))
-    tips = [alt.Tooltip("created_at:T", title="created", format="%d %b %H:%M"), alt.Tooltip("amount:Q", format=",.0f"),
-            "Band:N", alt.Tooltip("risk:Q", title="risk")] + ([alt.Tooltip("truth:N")] if truth else [])
-    dots = alt.Chart(hb).mark_circle(size=110, stroke="#fcfcfb", strokeWidth=2, opacity=1).encode(
-        x=alt.X("created_at:T", title=None),
-        y=alt.Y("amount:Q", title="Voucher amount (R)"),
-        color=alt.Color("Band:N", scale=band_scale(), legend=alt.Legend(orient="top", title="Risk band")),
-        tooltip=tips)
-    layers = dots
-    if truth and hb.is_scam.any():
-        layers = layers + alt.Chart(hb[hb.is_scam == 1]).mark_point(shape="diamond", size=320, color=SCAM,
-                                                                     strokeWidth=1.5).encode(
-            x="created_at:T", y="amount:Q", tooltip=tips)
-    st.altair_chart(layers.properties(height=230), use_container_width=True)
-    if truth:
-        st.caption("Orange diamond = scam voucher in the simulation.")
-
-    ev = customer_events(cid)
-    window = st.slider("Event window (days before the selected day)", 1, 30, 7)
-    t1 = START + pd.Timedelta(days=int(day) + 1)
-    recent = ev[(ev.time >= t1 - pd.Timedelta(days=window)) & (ev.time < t1) & ev.event_type.isin(
-        [e for e in EVENT_LABEL if e not in ("login", "logout")])]
-    st.subheader("Recent account activity")
-    st.dataframe(pd.DataFrame({
-        "Time": recent.time.dt.strftime("%d %b %H:%M"),
-        "Event": recent.event_type.map(EVENT_LABEL),
-        "Session": recent.session_id,
-        "Device": recent.device_id,
-        "Amount (R)": recent.amount.fillna(0).astype(int).replace(0, pd.NA),
-        "Recipient": recent.recipient_id,
-        "New limit (R)": recent.new_limit,
-        "Channel": recent.channel,
-    }).iloc[::-1], hide_index=True, use_container_width=True, height=300)
-
-    st.subheader("Vouchers")
-    st.dataframe(pd.DataFrame({
-        "Created": hist.created_at.dt.strftime("%d %b %H:%M"),
-        "Amount (R)": hist.amount.astype(int),
-        "Risk A": hist.risk_a.round(1), "Band A": hist.band_a.map(band_label),
-        "Risk B": hist.risk_b.round(1), "Band B": hist.band_b.map(band_label, na_action="ignore"),
-        "Reasons (stage B if cashed out)": hist.reasons_b.fillna(hist.reasons_a).fillna("")
-        .str.replace(" | ", " • ", regex=False),
-    } | ({"Truth": hist.scenario_type.str.replace("_", " ")} if truth else {})).iloc[::-1],
-        hide_index=True, use_container_width=True)
-
-# ---------------------------------------------------------------- model performance
-with tab_model:
-    st.markdown("Performance over the whole test period (days 120–179). Everything was tuned on earlier days.")
-    res = pd.read_csv(os.path.join(REPORT, "tables", "model_comparison.csv"))
-    res = res[res["operating point"].str.startswith("max F1")]
-    res = res[res.stage == stage.upper()][["model", "precision", "recall", "f1", "fpr", "pr_auc", "roc_auc"]]
-    res.columns = ["Model", "Precision", "Recall", "F1", "False positive rate", "PR-AUC", "ROC-AUC"]
-    st.dataframe(res.style.format(precision=3).highlight_max(subset=["F1", "PR-AUC"], color="#fde7dd"),
-                 hide_index=True, use_container_width=True)
-
-    left, right = st.columns(2)
-    with left:
-        st.markdown("**Risk bands by class (whole test period)**")
-        tab = pd.crosstab(scored[band], scored.is_scam).reindex(BANDS).fillna(0).astype(int)
-        tab.columns = ["Legitimate", "Scam"]
-        tab["Share of scams"] = (tab.Scam / tab.Scam.sum()).map("{:.0%}".format)
-        tab["Precision"] = (tab.Scam / (tab.Scam + tab.Legitimate)).map("{:.0%}".format)
-        tab.index = [band_label(b) for b in tab.index]
-        st.dataframe(tab, use_container_width=True)
-    with right:
-        st.markdown("**Detection by scenario (alerts = High + Critical)**")
-        sc = scored.groupby("scenario_type")[alert].agg(["mean", "size"]).reset_index()
-        sc["kind"] = sc.scenario_type.str.startswith("scam").map({True: "Scam", False: "Legitimate"})
-        sc["label"] = sc.scenario_type.str.replace("_", " ")
-        order = [s_.replace("_", " ") for s_ in ["scam_classic", "scam_self_send", "scam_limit_raise", "scam_split",
-                                                  "scam_subtle", "normal", "legit_emergency", "legit_new_phone",
-                                                  "legit_travel"]]
-        bars = alt.Chart(sc).mark_bar(cornerRadiusEnd=4).encode(
-            y=alt.Y("label:N", sort=order, title=None, scale=alt.Scale(paddingInner=0.25),
-                    axis=alt.Axis(labelOverlap=False, labelLimit=160)),
-            x=alt.X("mean:Q", title="Share of vouchers flagged", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
-            color=alt.Color("kind:N", scale=alt.Scale(domain=["Legitimate", "Scam"], range=[LEGIT, SCAM]),
-                            legend=alt.Legend(orient="top", title=None)),
-            tooltip=["label:N", alt.Tooltip("mean:Q", format=".1%", title="flagged"),
-                     alt.Tooltip("size:Q", title="vouchers")])
-        st.altair_chart(bars.properties(height=280), use_container_width=True)
-
-    for name, caption in [("pr_curves", "Precision–recall curves for every model"),
-                          ("learning_curve", "Learning curve: performance against training size"),
-                          ("sensitivity", "Sensitivity: rarer scams, rule ablation, rule-weight perturbation")]:
-        path = os.path.join(REPORT, "figures", f"{name}.png")
-        if os.path.exists(path):
-            st.image(path, caption=caption, use_container_width=True)
+        st.write(f'{int(alerts.is_scam.sum())} of the {int(today.is_scam.sum())} simulated scams were flagged.')
+    bands = st.multiselect('Show bands', ['Low', 'Medium', 'High', 'Critical'], default=['High', 'Critical'])
+    columns = ['score_time', 'voucher_id', 'customer_id', 'amount', 'risk', 'band', 'alert', 'rule_indicators']
+    if truth: columns += ['scenario_type', 'is_scam']
+    st.dataframe(today[today.band.isin(bands)].sort_values('risk', ascending=False)[columns].rename(columns=DISPLAY_NAMES), hide_index=True, width='stretch')
+    st.caption('Rule indicators show which checklist conditions were present. They are not explanations of the anomaly model. High and Critical correspond to an alert.')
+with customer:
+    ids = today.sort_values('risk', ascending=False).customer_id.drop_duplicates().tolist()
+    if ids:
+        cid = st.selectbox('Customer', ids)
+        history = part[(part.customer_id == cid) & (part.score_time < end)].sort_values('score_time')
+        cols = ['score_time', 'created_at', 'amount', 'risk', 'band', 'alert', 'rule_indicators']
+        if stage == 'B': cols.insert(2, 'redeemed_at')
+        if truth: cols += ['scenario_type']
+        st.dataframe(history[cols].rename(columns=DISPLAY_NAMES), hide_index=True, width='stretch')
+        st.caption('Only scored vouchers up to the selected day are shown. Cash-out dates are hidden in the creation view.')
+        if st.checkbox('Show recent account events (previous seven days)', value=False):
+            path = DATA/'events_log.csv'
+            if path.exists():
+                events = customer_events(cid, end, path.stat().st_mtime_ns)
+                if not events.empty:
+                    events['event_type'] = events.event_type.str.replace('_', ' ').str.capitalize()
+                    st.dataframe(events[['event_time', 'event_type', 'voucher_id', 'amount', 'new_limit', 'channel']].rename(columns=DISPLAY_NAMES), hide_index=True, width='stretch')
+                else:
+                    st.info('No account events in the preceding seven days.')
+    else:
+        st.info('No scored vouchers on this date.')
+with performance:
+    st.caption('Results over the complete test period, not just the selected day. Settings and thresholds were selected on earlier validation records.')
+    table = results[results.stage == stage][['model', 'precision', 'recall', 'f1', 'fpr']].copy()
+    table['fpr'] *= 100
+    table.columns = ['Model', 'Precision', 'Recall', 'F1', 'False positive rate (%)']
+    st.dataframe(table.style.format({c:'{:.3f}' for c in table.columns if c != 'Model'}), hide_index=True, width='stretch')
+    st.caption('Precision: how many alerts were scams. Recall: how many scams were caught. F1 balances both. False positive rate: how many legitimate vouchers were flagged.')
+    for name in ['model_f1', 'scenario_recall']:
+        image = REPORT/'figures'/f'{name}.png'
+        if image.exists(): st.image(str(image), width='stretch')

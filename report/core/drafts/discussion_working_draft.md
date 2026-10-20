@@ -1,0 +1,107 @@
+# 6 Results and discussion
+
+This chapter presents the results of the revised evaluation on the seed-42 synthetic dataset. Five approaches were compared at voucher creation and cash-out. Model settings and alert thresholds were selected using the earlier validation period, then kept fixed for testing. The findings describe performance within this simulation.
+
+## 6.1 Dataset checks and exploratory analysis
+
+The dataset contained 216,147 vouchers from 19,078 active customers over 180 days. Of these, 2,761 were labelled as scams, representing 1.28% of the vouchers. There were 209,222 recorded redemptions. All 20 implemented checks returned zero violations. These covered product limits, amount increments, redemption timing, history consistency, duplicate vouchers and agreement between feature and truth labels. Passing these checks established consistency with the implementation, rather than proof that the dataset represented real banking behaviour.
+
+The smaller EDA used activity before the test period. The median amount was R1,800 for scam vouchers and R600 for legitimate vouchers. Relative to the customer's preceding 90-day average, the medians were 1.68 and 1.00. Scam amounts therefore tended to be larger, although the distributions overlapped.
+
+Cash-out delays also differed, as shown in Figure 6.1. Around 58.5% of scam redemptions occurred within 15 minutes, compared with 9.1% of legitimate redemptions. Fast cash-out was consequently a possible warning indicator, but it was also present in legitimate activity.
+
+![Cash-out delays before the test period](discussion_figures/eda_cashout_delays.png)
+
+*Figure 6.1: Cash-out delays as percentages within each class, using redemptions before the test boundary. The final range includes all delays of six hours or more.*
+
+An unfamiliar recipient appeared in 68.6% of scam vouchers and 45.0% of legitimate vouchers in the earlier creation records. Recent limit changes occurred in 35.1% and 1.3%, while recent device changes occurred in 5.8% and 1.7%. These differences reflected the scenario settings. They suggested potentially useful indicators, but did not establish that any individual indicator could reliably identify a scam.
+
+## 6.2 Model results at creation and cash-out
+
+Validation selected 100 neighbours for LOF and nu = 0.1 for One-Class SVM at both stages. One-Class SVM had the highest validation F1 among the individual anomaly models, so it was combined equally with rules. The rule alert thresholds were 60 at creation and 80 at cash-out. The hybrid thresholds were approximately 0.717 and 0.816 on its 0–1 scale.
+
+Table 6.1 shows the creation-time results on 83,947 vouchers, including 1,162 scams. Precision measures how many alerts were scams, while recall measures how many scams were detected. F1 balances these measures; false positive rate measures how many legitimate vouchers were incorrectly flagged ([Le Borgne et al., 2022](https://fraud-detection-handbook.github.io/fraud-detection-handbook/Chapter_4_PerformanceMetrics/ThresholdBased.html)).
+
+| Approach | Precision | Recall | F1 | FPR (%) |
+|---|---:|---:|---:|---:|
+| Rules | 0.513 | 0.319 | 0.394 | 0.425 |
+| Isolation Forest | 0.415 | 0.301 | 0.349 | 0.597 |
+| LOF | 0.281 | 0.288 | 0.284 | 1.038 |
+| One-Class SVM | 0.374 | 0.386 | 0.380 | 0.905 |
+| Hybrid | 0.408 | 0.521 | 0.457 | 1.061 |
+
+*Table 6.1: Test results at voucher creation. Hybrid means the equal blend of rules and One-Class SVM. FPR is reported as a percentage.*
+
+The hybrid achieved the highest creation-time F1, at 0.457, compared with 0.394 for rules alone. Its recall increased to 52.1%, but its precision fell to 40.8%. The improvement therefore involved catching more scams while raising more false alerts. None of the individual anomaly models exceeded the rule baseline's F1 on these test records.
+
+Table 6.2 gives the cash-out results on 81,208 vouchers, including 1,162 scams. The hybrid again achieved the highest F1, at 0.545, followed by rules at 0.476. Rules had higher precision and fewer false positives, while the hybrid detected a larger share of scams.
+
+| Approach | Precision | Recall | F1 | FPR (%) |
+|---|---:|---:|---:|---:|
+| Rules | 0.639 | 0.380 | 0.476 | 0.311 |
+| Isolation Forest | 0.330 | 0.331 | 0.331 | 0.974 |
+| LOF | 0.385 | 0.331 | 0.356 | 0.768 |
+| One-Class SVM | 0.283 | 0.495 | 0.360 | 1.821 |
+| Hybrid | 0.550 | 0.540 | 0.545 | 0.641 |
+
+*Table 6.2: Test results at cash-out. Records enter this period according to cash-out time.*
+
+Figure 6.2 compares F1 across the five approaches. Additional cash-out information did not improve every approach: Isolation Forest and One-Class SVM had lower F1 at this stage. The hybrid's precision increased from 40.8% to 55.0%, while recall changed from 52.1% to 54.0%. These are separate stage evaluations with different eligible records and independently selected thresholds. The difference cannot be attributed entirely to the redemption features.
+
+![F1 comparison for the five approaches](discussion_figures/model_f1.png)
+
+*Figure 6.2: Test F1 at creation and cash-out. Hybrid uses rules and One-Class SVM at both stages.*
+
+## 6.3 Scams detected, missed scams and false alerts
+
+The decision counts in Table 6.3 make the hybrid's trade-off clearer. At creation, rules alone detected 371 scams and flagged 352 legitimate vouchers. The hybrid detected 605 scams and flagged 878 legitimate vouchers: 234 additional scams detected, alongside 526 additional false alerts.
+
+| Hybrid decision | Creation | Cash-out |
+|---|---:|---:|
+| Scams detected | 605 | 628 |
+| Scams missed | 557 | 534 |
+| Legitimate vouchers flagged | 878 | 513 |
+| Legitimate vouchers left unflagged | 81,907 | 79,533 |
+
+*Table 6.3: Hybrid confusion-matrix counts on the test period.*
+
+At cash-out, rules detected 441 scams and flagged 249 legitimate vouchers. The hybrid detected 187 additional scams, with 264 additional false alerts. This could be useful for review, but higher detection alone would not justify treating every alert as confirmed fraud.
+
+Detection varied considerably between scenarios (Figure 6.3 and Table 6.4). Limit-raise scams were most frequently detected, with recall of 85.7% at creation and 83.1% at cash-out. Subtle scams remained difficult: only 21 of 154 were detected at creation and 19 at cash-out. This was consistent with their less pronounced warning indicators, although the experiment did not isolate the contribution of each feature.
+
+![Hybrid recall across scam scenarios](discussion_figures/scenario_recall.png)
+
+*Figure 6.3: Percentage of scam vouchers flagged by the hybrid in each scenario.*
+
+| Scenario | Creation | Rate (%) | Cash-out | Rate (%) |
+|---|---:|---:|---:|---:|
+| Classic scam | 172 / 269 | 63.9 | 180 / 269 | 66.9 |
+| Limit-raise scam | 162 / 189 | 85.7 | 157 / 189 | 83.1 |
+| Self-send scam | 67 / 192 | 34.9 | 78 / 192 | 40.6 |
+| Split-voucher scam | 183 / 358 | 51.1 | 194 / 358 | 54.2 |
+| Subtle scam | 21 / 154 | 13.6 | 19 / 154 | 12.3 |
+| Legitimate emergency | 176 / 268 | 65.7 | 141 / 264 | 53.4 |
+| Legitimate new-phone use | 100 / 550 | 18.2 | 38 / 531 | 7.2 |
+| Legitimate travel | 2 / 288 | 0.7 | 2 / 282 | 0.7 |
+
+*Table 6.4: Hybrid alert rates by scenario. For scam rows, the rate is recall; for legitimate rows, it is the false-alarm rate within that scenario. Counts show flagged vouchers / total vouchers, rather than distinct scam episodes.*
+
+Legitimate emergencies were an important weakness. The hybrid flagged 65.7% at creation and 53.4% at cash-out. These episodes deliberately shared indicators such as unusual amounts or recent account changes with scams. Ordinary legitimate vouchers had much lower false-alarm rates of 0.73% and 0.42%, respectively. The low overall false positive rate therefore concealed a much higher burden for customers making legitimate emergency payments.
+
+## 6.4 Prototype demonstration
+
+The dashboard presented the saved hybrid scores in an alert queue, a customer history view and a model comparison view. Users could select the scoring point and date, inspect voucher amounts and rule indicators, and view a customer's earlier scored vouchers and recent account events. Date filtering followed creation time at Stage A and cash-out time at Stage B. High and Critical bands matched the alert decisions used in the evaluation.
+
+The rule indicators showed which checklist conditions were present; they did not explain the internal One-Class SVM decision. The optional simulation labels supported inspection during demonstration. The prototype used precomputed scores and did not measure live processing speed, analyst effectiveness or the effect of warnings and payment delays.
+
+## 6.5 Interpretation and limitations
+
+The results support using behavioural risk scoring to identify a share of scam-associated vouchers within this simulation. The hybrid provided a better balance of precision and recall than rules or the individual anomaly models, but still missed almost half of the scams. Its strongest results were for prominent warning patterns, while subtle scams and legitimate emergencies remained weaknesses.
+
+For the question of relevant indicators, the earlier EDA showed differences in amounts, recent limit changes and redemption timing. However, the evaluation did not test the contribution of each feature separately, so it cannot rank their individual importance. For the comparison of methods, the hybrid had the highest test F1 at both stages, while rules remained more precise. For intervention, the false alerts support considering additional verification and analyst review; this experiment did not demonstrate that automatic blocking would be effective or acceptable to customers.
+
+The main limitation is that customer behaviour, scam probabilities and rule weights were assumptions in a synthetic dataset. Earlier labelled analysis had also informed dataset development, and these data had already been examined. The revised test period should therefore not be described as untouched throughout the research process. Anomaly fitting excluded labels, but validation selection used them. The stage populations differed, and no repeated-seed or uncertainty analysis formed part of this smaller evaluation. The findings provide evidence for this controlled comparison, rather than estimated performance for a real bank.
+
+## References
+
+Le Borgne, Y.-A., Siblini, W., Lebichot, B. and Bontempi, G. (2022). *Reproducible Machine Learning for Credit Card Fraud Detection — Practical Handbook*. Université Libre de Bruxelles. [Threshold-based metrics](https://fraud-detection-handbook.github.io/fraud-detection-handbook/Chapter_4_PerformanceMetrics/ThresholdBased.html).
