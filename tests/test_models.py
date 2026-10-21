@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from test_generator import cfg, dataset  # noqa: F401  (shared fixtures)
-from models import (STAGE_A_FEATURES, STAGE_B_FEATURES, REDUNDANT, autoencoder, band, hybrid_score,
+from models import (STAGE_A_FEATURES, STAGE_B_FEATURES, REDUNDANT, band, hybrid_score,
                     isolation_forest, lof, one_class_svm, rule_hits, rule_score)
 
 
@@ -45,29 +45,10 @@ def test_isolation_forest_percentile(df):
     assert np.allclose(h, [0.5, 0.5])
 
 
-@pytest.mark.parametrize("make", [lof, one_class_svm, autoencoder])
-def test_distance_and_neural_scorers(df, make):
+@pytest.mark.parametrize("make", [lof, one_class_svm])
+def test_distance_scorers(df, make):
     train = df[df.split == "train"]
     scorer = make(STAGE_A_FEATURES).fit(train)
     assert not REDUNDANT & set(scorer.features)
     s = scorer.score(df)
     assert s.min() >= 0 and s.max() <= 1 and np.isfinite(s).all()
-
-
-def test_dashboard_band_cutoffs_are_ordered():
-    from score_all import band_cutoffs, to_band
-    rng = np.random.default_rng(0)
-    y = rng.random(5000) < 0.02
-    s = np.clip(rng.normal(0.5, 0.15, 5000) + 0.3 * y, 0, 1)
-    cut = band_cutoffs(y, s, 0.7)
-    assert cut["Medium"] <= cut["High"] == 70 <= cut["Critical"]
-    assert list(to_band(np.array([0, cut["Medium"], cut["High"], cut["Critical"]]), cut)) == \
-        ["Low", "Medium", "High", "Critical"]
-
-
-def test_supervised_benchmark_learns(df):
-    from models import supervised_gbm
-    train, test = df[df.split == "train"], df[df.split == "test"]
-    s = supervised_gbm(STAGE_A_FEATURES).fit(train).score(test)
-    assert s.min() >= 0 and s.max() <= 1
-    assert s[test.is_scam.to_numpy() == 1].mean() > s[test.is_scam.to_numpy() == 0].mean()

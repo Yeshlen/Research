@@ -48,11 +48,11 @@ All features are computed from events **before** the moment being scored (stream
 
 | Feature | Meaning |
 |---|---|
-| `redeemed` | Voucher cashed out within the window (else expired / pending) |
-| `redeem_delay_min` | Minutes from creation to cash-out |
-| `redeem_dist_home_km` | Distance of cash-out point from customer's home |
-| `redeem_dist_usual_km` | Distance from the centroid of the customer's earlier cash-outs |
-| `redeem_hour`, `redeem_is_night` | Time of cash-out |
+| `redeemed` | Voucher redeemed within the window (else expired / pending) |
+| `redeem_delay_min` | Minutes from creation to redemption |
+| `redeem_dist_home_km` | Distance of redemption point from customer's home |
+| `redeem_dist_usual_km` | Distance from the centroid of the customer's earlier redemptions |
+| `redeem_hour`, `redeem_is_night` | Time of redemption |
 | `redeem_at_atm` | ATM vs retailer |
 
 ### Labels and bookkeeping

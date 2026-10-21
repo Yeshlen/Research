@@ -1,63 +1,62 @@
-# COS700: Real-Time Behavioural Risk Scoring for Cardless Cash Withdrawal Fraud
+# COS700: Behavioural Risk Scoring for Cardless Cash Withdrawal Fraud
 
 University of Pretoria COS700 research project (supervisor: Prof Jan Eloff).
 
-Prototype that simulates mobile banking events, extracts behavioural features, scores cardless withdrawal vouchers (CashSend / eWallet / Instant Money style) and raises alerts for likely social-engineering (vishing) scams.
+A prototype that simulates mobile banking events, extracts behavioural features and scores cardless withdrawal vouchers for possible social-engineering scams.
 
-## Layout
+## Setup and notebook workflow
 
-| Path | Contents |
+Create a Python environment and install `requirements.txt`. Select that environment as the notebook kernel, then run all cells in each notebook in order:
+
+| Notebook | What it does |
 |---|---|
-| `src/` | Synthetic data generator, feature extraction, rule-based scoring, anomaly models, evaluation |
-| `data/synthetic/` | Generated datasets (not committed; regenerate from the seed) |
-| `app/` | Streamlit monitoring dashboard |
-| `tests/` | Sanity and constraint tests for the generator |
-| `report/` | LaTeX report (course template), bibliography and figures |
-| `docs/` | Dataset design and report planning notes |
-| `inputs/` | Submitted proposal and the report guideline slides |
-
-## Setup
+| `notebooks/01_data_and_eda.ipynb` | Prepare/reuse data, check records, describe scenarios and draw three EDA plots |
+| `notebooks/02_fit_models.ipynb` | Create and fit models; choose settings, alert thresholds and one hybrid using validation records |
+| `notebooks/03_results_and_dashboard.ipynb` | Evaluate fixed choices, draw results plots and export dashboard scores |
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+jupyter lab
 ```
 
-## Generate the dataset
+Notebook 01 reuses an existing dataset. Set its `REGENERATE` flag only when rebuilding the simulator data. Data files and fitted-model binaries are excluded from Git; if either is absent, run the preceding notebooks. Outputs are saved under `report/core/`, with fitted models in `report/core/models/`.
+
+## Dataset simulator
+
+The active entry point is `src/simulate.py`. Its generation stages are in `src/simulator/`: customer profiles, ordinary activity, special scenarios, event recording and CSV output. Start with `src/simulator/run.py` and `docs/simulator_guide.md` to follow the process. The original single-file implementation is preserved unchanged in `archived/simulate.py`.
+
+For a small example in a separate folder:
 
 ```bash
-python src/simulate.py      # customers -> event log (data/synthetic/events_log.csv), ~1 min
-python src/features.py      # event log -> feature table (data/synthetic/cardless_features.csv), ~1 min
-python src/validate.py      # constraint checks, summary, "too easy" check
-python src/eda.py           # EDA figures -> report/figures, tables -> report/tables
-python src/evaluate.py      # rules, IF, LOF, OCSVM, autoencoder, hybrids on the test split (~2 min)
-python src/experiments.py   # bootstrap CIs, learning curve, seeds, ablations, label budget (~25 min; see docs/robustness.md)
-python src/score_all.py     # score the test period with Rules + OCSVM for the dashboard (~1 min)
-streamlit run app/dashboard.py
-pytest -q                   # generator and scoring tests on a small population
+python src/simulate.py --customers 10 --out data/simulator_demo
+python src/features.py --data data/simulator_demo
 ```
 
-All parameters live in `config/generator.yaml`; the same seed gives the same dataset. Column meanings: `docs/data_dictionary.md`.
+Notebook 01 uses the same `simulator.generate_dataset` function when regeneration is enabled. The current configuration uses seed 75; existing saved evaluation results describe the earlier seed-42 dataset. Regenerating data requires rerunning model fitting and evaluation before comparing new results.
 
-## Status
+## Revised comparison
 
-- [x] Dataset design draft (`docs/dataset_design.md`)
-- [x] Generator v1: event log, streaming features, validation, tests
-- [x] EDA figures and findings (`docs/eda_findings.md`)
-- [x] Rule-based, Isolation Forest and hybrid scoring (`docs/model_results.md`)
-- [x] LOF, One-Class SVM, autoencoder and their hybrids
-- [x] Supervised upper-bound benchmark and label-budget curve
-- [x] Learning curve and sensitivity analysis (`docs/robustness.md`)
-- [x] Dashboard (`app/dashboard.py`): alert queue with risk bands and reasons, customer drill-down, model performance
-- [ ] Report
+Exactly five approaches at voucher creation and redemption: rules, Isolation Forest, LOF, One-Class SVM, and one equal-weight hybrid combining rules with the best validation anomaly model. Fit 90 days, validate 30 days, test 60 days. Creation uses creation dates; redemption uses redemption dates. Model settings and alert thresholds are selected by validation F1 before the test period is scored.
 
-## Dashboard
+Results report precision, recall, F1, false positive rate, underlying decision counts and scenario rates. The anomaly models fit without labels, but validation selection uses scam labels. The data is synthetic and was already examined during development.
 
-`streamlit run app/dashboard.py` replays the test period (days 120–179) as a bank analyst would see it:
+Full procedure: `docs/core_workflow.md`. Configuration: `config/generator.yaml`. Feature definitions and simulator assumptions: `docs/data_dictionary.md` and `docs/dataset_design.md`.
 
-- **Alert queue:** choose a day and a scoring point (creation or cash-out) to see that day's alerts. Each shows its risk score, its Low/Medium/High/Critical band and the reasons it was flagged. An evaluation toggle reveals which alerts were real scams.
-- **Customer drill-down:** a customer's vouchers coloured by band, plus their recent account events (limit changes, new devices, new recipients, cash-outs).
-- **Model switch:** the label-free Rules + OCSVM system, or the supervised benchmark for comparison.
-- **Model performance:** the comparison table, band precision, detection per scenario, and the PR, learning-curve and sensitivity figures.
+## Dashboard and checks
 
-Band cut-offs are set on validation days, never on the days shown: Medium keeps 80% recall, High is the max-F1 alert threshold, and Critical is where precision reaches 70%. Screenshots are in `report/figures/dashboard_*.png`.
+After running all three notebooks:
+
+```bash
+streamlit run app/dashboard.py
+pytest -q
+```
+
+The dashboard replays saved test-period scores. It includes an alert queue, customer history and the five-model comparison, using the same selected hybrid and alert threshold as the notebooks. Rule indicators describe checklist conditions; anomaly scores and risk bands are not fraud probabilities. The date filter uses the scoring event at each stage. A ground-truth switch supports demonstration and is off by default.
+
+The notebooks are the main analysis workflow. Reusable Python modules remain in `src/` for simulation, feature extraction, scoring and checks; the application remains in `app/`.
+
+## Earlier analyses
+
+Original extended evaluation scripts and documentation are preserved under `archive/extended_evaluation/`. Figures/tables outside `report/core/` and earlier LaTeX report fragments describe the older experiment. They are historical, not outputs of the revised five-approach evaluation. See `docs/eda_findings.md` and `docs/model_results.md` for the new run.
