@@ -23,6 +23,19 @@ jupyter lab
 
 Notebook 01 reuses an existing dataset. Set its `REGENERATE` flag only when rebuilding the simulator data. Data files and fitted-model binaries are excluded from Git; if either is absent, run the preceding notebooks. Outputs are saved under `report/core/`, with fitted models in `report/core/models/`.
 
+## Dataset simulator
+
+The active entry point is `src/simulate.py`. Its generation stages are in `src/simulator/`: customer profiles, ordinary activity, special scenarios, event recording and CSV output. Start with `src/simulator/run.py` and `docs/simulator_guide.md` to follow the process. The original single-file implementation is preserved unchanged in `archived/simulate.py`.
+
+For a small example in a separate folder:
+
+```bash
+python src/simulate.py --customers 10 --out data/simulator_demo
+python src/features.py --data data/simulator_demo
+```
+
+Notebook 01 uses the same `simulator.generate_dataset` function when regeneration is enabled. The current configuration uses seed 75; existing saved evaluation results describe the earlier seed-42 dataset. Regenerating data requires rerunning model fitting and evaluation before comparing new results.
+
 ## Revised comparison
 
 Exactly five approaches at voucher creation and redemption: rules, Isolation Forest, LOF, One-Class SVM, and one equal-weight hybrid combining rules with the best validation anomaly model. Fit 90 days, validate 30 days, test 60 days. Creation uses creation dates; redemption uses redemption dates. Model settings and alert thresholds are selected by validation F1 before the test period is scored.

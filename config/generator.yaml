@@ -2,7 +2,7 @@
 # Every value here is either sourced (see `source:` comments) or a stated assumption.
 # Regenerating with the same seed and config gives an identical dataset.
 
-seed: 42
+seed: 75
 n_customers: 20000
 start_date: "2025-07-01"
 days: 180                      # observation window (6 paydays + December festive period)
@@ -96,9 +96,9 @@ metros:                        # lat, lon, population weight (approximate metro 
   Johannesburg: [-26.20, 28.05, 0.28]
   Cape Town:    [-33.92, 18.42, 0.19]
   eThekwini:    [-29.86, 31.02, 0.16]
-  Tshwane:      [-25.75, 28.19, 0.13]
+  Pretoria:      [-25.75, 28.19, 0.13]
   Ekurhuleni:   [-26.15, 28.35, 0.10]
-  Nelson Mandela Bay: [-33.96, 25.60, 0.05]
+  NMB: [-33.96, 25.60, 0.05]
   Mangaung:     [-29.12, 26.21, 0.04]
   Buffalo City: [-32.98, 27.87, 0.03]
   Polokwane:    [-23.90, 29.45, 0.02]

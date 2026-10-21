@@ -10,7 +10,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
 from features import extract  # noqa: E402
-from simulate import Simulator  # noqa: E402
+from simulator import generate_dataset  # noqa: E402
 from validate import constraint_violations  # noqa: E402
 
 
@@ -25,7 +25,7 @@ def cfg():
 @pytest.fixture(scope="module")
 def dataset(cfg, tmp_path_factory):
     out = tmp_path_factory.mktemp("sim")
-    Simulator(cfg).run(str(out))
+    generate_dataset(cfg, out)
     return out, extract(str(out), cfg)
 
 
@@ -37,7 +37,7 @@ def test_no_constraint_violations(cfg, dataset):
 
 def test_same_seed_same_data(cfg, dataset, tmp_path):
     out, _ = dataset
-    Simulator(cfg).run(str(tmp_path))
+    generate_dataset(cfg, tmp_path)
     a = pd.read_csv(out / "events_log.csv")
     b = pd.read_csv(tmp_path / "events_log.csv")
     pd.testing.assert_frame_equal(a, b)

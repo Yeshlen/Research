@@ -23,7 +23,7 @@ The dashboard displays saved test scores, uses the scoring date for filtering, a
 
 Tables, PNG/PDF plots and run metadata: `report/core/`. Locally saved fitted models: `report/core/models/` (ignored by Git). Dashboard records: `data/synthetic/core_scored_vouchers.csv` and `core_dashboard_meta.json` (also ignored). Run notebook 02 before 03 if the fitted-model file is absent. A fingerprint prevents use of models/results after data, configuration or fitting code changes.
 
-Simulator seed: 42; model/subsample seed: 0. The generated data is not committed. Use the same configuration and software environment when reproducing the run. The existing dataset and previous results were already examined during development; this is a revised evaluation, not a new unseen dataset. Stage populations differ, so changes between stages cannot be attributed solely to adding redemption features.
+The saved evaluation used simulator seed 42 and model/subsample seed 0. The current generator configuration uses seed 75; it does not alter existing CSVs or results until regeneration is explicitly run. The generated data is not committed. Use the same configuration and software environment when reproducing the run. The existing dataset and previous results were already examined during development; this is a revised evaluation, not a new unseen dataset. Stage populations differ, so changes between stages cannot be attributed solely to adding redemption features.
 
 ## Earlier work
 
