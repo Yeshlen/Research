@@ -1,6 +1,6 @@
 # Revised model results
 
-Source: executed notebooks 02 and 03. Models fit on days 0–89, use validation days 90–119, and test on days 120–179. Stage A follows creation time; B follows cash-out time. The dataset was previously examined during development.
+Source: executed notebooks 02 and 03. Models fit on days 0–89, use validation days 90–119, and test on days 120–179. Stage A follows creation time; B follows redemption time. The dataset was previously examined during development.
 
 Exactly five methods per stage: rules, Isolation Forest, LOF, One-Class SVM and one equal-weight hybrid. Validation F1 selected LOF with 100 neighbours and SVM with nu=0.1 at both stages. SVM had the highest validation F1 among the anomaly families, so the hybrid uses it at both stages. No labels entered anomaly fitting; labelled validation selected settings and thresholds.
 
@@ -17,7 +17,7 @@ Exactly five methods per stage: rules, Isolation Forest, LOF, One-Class SVM and 
 | B | One-Class SVM | 0.283 | 0.495 | 0.360 | 1.821 | 575 | 1458 | 587 | 78588 |
 | B | Hybrid | 0.550 | 0.540 | 0.545 | 0.641 | 628 | 513 | 534 | 79533 |
 
-The hybrid caught more scams than rules, with more false alerts. Legitimate emergency false-alarm rates were 65.7% at creation and 53.4% at cash-out. Subtle-scam recall was 13.6% and 12.3%. See `report/core/tables/scenario_detection.csv` for all methods and scenario counts.
+The hybrid caught more scams than rules, with more false alerts. Legitimate emergency false-alarm rates were 65.7% at creation and 53.4% at redemption. Subtle-scam recall was 13.6% and 12.3%. See `report/core/tables/scenario_detection.csv` for all methods and scenario counts.
 
 Stage A test vouchers: 83,947. Stage B: 81,208. Both contained 1,162 scam vouchers. Stage populations and separately selected thresholds differ, so these are not a controlled measurement of adding redemption features alone. No uncertainty or repeated-seed experiments are included in the revised evaluation.
 

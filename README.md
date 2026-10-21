@@ -25,7 +25,7 @@ Notebook 01 reuses an existing dataset. Set its `REGENERATE` flag only when rebu
 
 ## Revised comparison
 
-Exactly five approaches at voucher creation and cash-out: rules, Isolation Forest, LOF, One-Class SVM, and one equal-weight hybrid combining rules with the best validation anomaly model. Fit 90 days, validate 30 days, test 60 days. Creation uses creation dates; cash-out uses cash-out dates. Model settings and alert thresholds are selected by validation F1 before the test period is scored.
+Exactly five approaches at voucher creation and redemption: rules, Isolation Forest, LOF, One-Class SVM, and one equal-weight hybrid combining rules with the best validation anomaly model. Fit 90 days, validate 30 days, test 60 days. Creation uses creation dates; redemption uses redemption dates. Model settings and alert thresholds are selected by validation F1 before the test period is scored.
 
 Results report precision, recall, F1, false positive rate, underlying decision counts and scenario rates. The anomaly models fit without labels, but validation selection uses scam labels. The data is synthetic and was already examined during development.
 

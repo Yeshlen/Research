@@ -29,29 +29,29 @@
 
 \section{Results and discussion}
 
-The evaluation examined whether behavioural risk scoring could identify suspicious cardless withdrawal vouchers while limiting alerts on legitimate activity. This chapter first considers the records produced by the simulator and the behaviour visible in the data. It then compares the scoring methods at voucher creation and cash-out, before examining missed scams and false alerts in more detail. These findings provide the basis for considering how the prototype could support the review of high-risk vouchers.
+The evaluation examined whether behavioural risk scoring could identify suspicious cardless withdrawal vouchers while limiting alerts on legitimate activity. This chapter first considers the records produced by the simulator and the behaviour visible in the data. It then compares the scoring methods at voucher creation and redemption, before examining missed scams and false alerts in more detail. These findings provide the basis for considering how the prototype could support the review of high-risk vouchers.
 
 \FloatBarrier\subsection{Dataset checks and exploratory analysis}
 
-The first part of the evaluation considered whether the simulator had produced usable records for the model comparison. Over the 180-day observation period, 19,078 active customers created 216,147 vouchers, of which 2,761 were labelled as scams. Scams therefore accounted for 1.28\% of the vouchers, leaving the scoring methods to identify a small minority within a much larger volume of legitimate activity. Most vouchers were redeemed, with 209,222 cash-outs recorded during the observation window.
+The first part of the evaluation considered whether the simulator had produced usable records for the model comparison. Over the 180-day observation period, 19,078 active customers created 216,147 vouchers, of which 2,761 were labelled as scams. Scams therefore accounted for 1.28\% of the vouchers, leaving the scoring methods to identify a small minority within a much larger volume of legitimate activity. Most vouchers were redeemed, with 209,222 redemptions recorded during the observation window.
 
 Before examining differences between the classes, the records were checked against the product constraints and the information required for scoring. All 20 checks returned zero violations, including those covering amount increments, sending limits, redemption timing and consistency of customer history. There were also no duplicate voucher identifiers or disagreements between feature labels and the truth file. These results established that the records met the implemented checks, allowing the comparison to proceed without the identified forms of invalid or inconsistent data.
 
 EDA then considered whether the behaviours used for scoring differed between legitimate and scam vouchers. To examine these patterns before evaluating the models, class comparisons used activity from the fitting and validation periods. Amount was one visible difference: scam vouchers had a median of R1,800, compared with R600 for legitimate vouchers. The difference remained when amounts were considered relative to the customer's preceding 90-day average, with median ratios of 1.68 and 1.00. This showed why customer history could provide useful context for the amount being sent, although the overlapping distributions meant that a large voucher could still be legitimate.
 
-The time taken to redeem a voucher provided another view of the behaviour surrounding the transaction. As shown in Figure 6.1, 58.5\% of scam redemptions occurred within 15 minutes, compared with 9.1\% of legitimate redemptions. Rapid cash-out was therefore more common in the simulated scams, making it a relevant pattern to examine at the second scoring point. However, its presence in legitimate payments also showed why it could not establish fraud by itself.
+The time taken to redeem a voucher provided another view of the behaviour surrounding the transaction. As shown in Figure 6.1, 58.5\% of scam redemptions occurred within 15 minutes, compared with 9.1\% of legitimate redemptions. Rapid redemption was therefore more common in the simulated scams, making it a relevant pattern to examine at the second scoring point. However, its presence in legitimate payments also showed why it could not establish fraud by itself.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=.92\linewidth]{discussion_figures/eda_cashout_delays.png}
-\caption{Cash-out delays as percentages within each class, using redemptions before the test boundary. The final range includes all delays of six hours or more.}
+\includegraphics[width=.92\linewidth]{discussion_figures/eda_redemption_delays.png}
+\caption{Redemption delays as percentages within each class, using redemptions before the test boundary. The final range includes all delays of six hours or more.}
 \end{figure}
 
 A similar issue was visible in recipient and account changes. An unfamiliar recipient appeared in 68.6\% of scam vouchers, but also in 45.0\% of legitimate vouchers, so flagging every first-time recipient would affect many legitimate payments. Recent limit changes showed a clearer difference between the classes, occurring in 35.1\% of scam vouchers and 1.3\% of legitimate vouchers. Recent device changes were less frequent in both, at 5.8\% and 1.7\%, respectively. These patterns reflected the behaviour specified in the simulator and indicated where the classes differed; they did not measure the importance of each feature to a model.
 
 Taken together, the EDA showed both differences and overlap in the simulated activity. The scoring methods had behavioural information to work with, but none of these individual observations made unusual activity equivalent to fraud. The next part of the evaluation therefore examined whether rules, anomaly models and their combination could distinguish the classes more effectively.
 
-\FloatBarrier\subsection{Model results at creation and cash-out}
+\FloatBarrier\subsection{Model results at creation and redemption}
 
 Rules provided the baseline for assessing whether anomaly detection added value to the warning indicators already defined in the prototype. Three anomaly models were compared with this baseline, and the strongest anomaly model on validation data was combined equally with rules. Validation selected One-Class SVM for this combination at both stages, using nu = 0.1, while LOF selected 100 neighbours. The following test results use these saved settings and validation-selected alert thresholds, allowing the comparison to assess decisions fixed before test scoring.
 
@@ -75,11 +75,11 @@ Hybrid & 0.408 & 0.521 & 0.457 & 1.061 \\
 
 None of the individual anomaly models exceeded the rule baseline's test F1 at creation. This was relevant to the purpose of the comparison: learning unusual patterns did not, on its own, produce a better balance of detection and false alerts than the explicit warning rules. The hybrid result nevertheless showed that combining anomaly information with those rules could improve that balance within the simulation. The benefit came from how the two components were used together, rather than from replacing the rules with an anomaly model.
 
-At cash-out, the hybrid again achieved the highest F1, reaching 0.545, while rules reached 0.476 (Table 6.2). The same trade-off remained: rules had higher precision, at 63.9\%, while the hybrid detected a larger share of scams, with recall of 54.0\%. The preferred approach would therefore depend on whether the priority was to identify more scams or to limit the number of legitimate vouchers requiring review. Under the F1 measure used in this experiment, the hybrid provided the stronger combined result.
+At redemption, the hybrid again achieved the highest F1, reaching 0.545, while rules reached 0.476 (Table 6.2). The same trade-off remained: rules had higher precision, at 63.9\%, while the hybrid detected a larger share of scams, with recall of 54.0\%. The preferred approach would therefore depend on whether the priority was to identify more scams or to limit the number of legitimate vouchers requiring review. Under the F1 measure used in this experiment, the hybrid provided the stronger combined result.
 
 \begin{table}[htbp]
 \centering\small
-\caption{Test results at cash-out. Records enter this period according to cash-out time.}
+\caption{Test results at redemption. Records enter this period according to redemption time.}
 \begin{tabularx}{\linewidth}{Yrrrr}
 \toprule
 \textbf{Approach} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{FPR (\%)} \\
@@ -93,12 +93,12 @@ Hybrid & 0.550 & 0.540 & 0.545 & 0.641 \\
 \end{tabularx}
 \end{table}
 
-The stage comparison in Figure 6.2 also shows that the cash-out results were not uniformly better for every method. Isolation Forest and One-Class SVM had lower F1 at cash-out, while rules, LOF and the hybrid had higher F1. For the hybrid, precision increased from 40.8\% at creation to 55.0\% at cash-out, whereas recall changed more modestly, from 52.1\% to 54.0\%. The main difference was therefore in how often its alerts were correct. However, Stage A evaluated 83,947 vouchers and Stage B evaluated 81,208, with periods assigned by their respective scoring times and thresholds selected separately. These results compare the two scoring stages; they do not isolate the effect of adding redemption features alone.
+The stage comparison in Figure 6.2 also shows that the redemption results were not uniformly better for every method. Isolation Forest and One-Class SVM had lower F1 at redemption, while rules, LOF and the hybrid had higher F1. For the hybrid, precision increased from 40.8\% at creation to 55.0\% at redemption, whereas recall changed more modestly, from 52.1\% to 54.0\%. The main difference was therefore in how often its alerts were correct. However, Stage A evaluated 83,947 vouchers and Stage B evaluated 81,208, with periods assigned by their respective scoring times and thresholds selected separately. These results compare the two scoring stages; they do not isolate the effect of adding redemption features alone.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=.92\linewidth]{discussion_figures/model_f1.png}
-\caption{Test F1 at creation and cash-out. Hybrid uses rules and One-Class SVM at both stages.}
+\caption{Test F1 at creation and redemption. Hybrid uses rules and One-Class SVM at both stages.}
 \end{figure}
 
 \FloatBarrier\subsection{Scams detected, missed scams and false alerts}
@@ -110,7 +110,7 @@ The metric comparison showed that the hybrid improved F1, but the decision count
 \caption{Hybrid confusion-matrix counts on the test period.}
 \begin{tabularx}{\linewidth}{Yrr}
 \toprule
-\textbf{Hybrid decision} & \textbf{Creation} & \textbf{Cash-out} \\
+\textbf{Hybrid decision} & \textbf{Creation} & \textbf{Redemption} \\
 \midrule
 Scams detected & 605 & 628 \\
 Scams missed & 557 & 534 \\
@@ -120,9 +120,9 @@ Legitimate vouchers left unflagged & 81,907 & 79,533 \\
 \end{tabularx}
 \end{table}
 
-At cash-out, the hybrid detected 628 scams and flagged 513 legitimate vouchers, compared with 441 scams and 249 legitimate vouchers for rules. It again detected more scams, with 187 more scam vouchers identified overall and 264 more legitimate vouchers flagged. These counts show why an alert should lead to further assessment: even the method with the highest F1 produced substantial false alerts and missed many scams.
+At redemption, the hybrid detected 628 scams and flagged 513 legitimate vouchers, compared with 441 scams and 249 legitimate vouchers for rules. It again detected more scams, with 187 more scam vouchers identified overall and 264 more legitimate vouchers flagged. These counts show why an alert should lead to further assessment: even the method with the highest F1 produced substantial false alerts and missed many scams.
 
-An overall detection rate could also conceal which scam patterns the hybrid identified. Figure 6.3 and Table 6.4 show that limit-raise scams were most frequently detected, with recall of 85.7\% at creation and 83.1\% at cash-out. These scenarios included a prominent account change together with other possible warning indicators. Subtle scams, which were designed with less pronounced indicators, remained difficult: only 21 of 154 were detected at creation and 19 at cash-out. The contrast was consistent with the scenario design, although the experiment did not isolate the contribution of each feature.
+An overall detection rate could also conceal which scam patterns the hybrid identified. Figure 6.3 and Table 6.4 show that limit-raise scams were most frequently detected, with recall of 85.7\% at creation and 83.1\% at redemption. These scenarios included a prominent account change together with other possible warning indicators. Subtle scams, which were designed with less pronounced indicators, remained difficult: only 21 of 154 were detected at creation and 19 at redemption. The contrast was consistent with the scenario design, although the experiment did not isolate the contribution of each feature.
 
 \begin{figure}[htbp]
 \centering
@@ -135,7 +135,7 @@ An overall detection rate could also conceal which scam patterns the hybrid iden
 \caption{Hybrid alert rates by scenario. For scam rows, the rate is recall; for legitimate rows, it is the false-alarm rate within that scenario. Counts show flagged vouchers / total vouchers, rather than distinct scam episodes.}
 \begin{tabularx}{\linewidth}{Yrrrr}
 \toprule
-\textbf{Scenario} & \textbf{Creation} & \textbf{Rate (\%)} & \textbf{Cash-out} & \textbf{Rate (\%)} \\
+\textbf{Scenario} & \textbf{Creation} & \textbf{Rate (\%)} & \textbf{Redemption} & \textbf{Rate (\%)} \\
 \midrule
 Classic scam & 172 / 269 & 63.9 & 180 / 269 & 66.9 \\
 Limit-raise scam & 162 / 189 & 85.7 & 157 / 189 & 83.1 \\
@@ -149,7 +149,7 @@ Legitimate travel & 2 / 288 & 0.7 & 2 / 282 & 0.7 \\
 \end{tabularx}
 \end{table}
 
-The legitimate scenarios showed the other side of this difficulty. Emergency payments deliberately shared behaviours such as unusual amounts and recent account changes with scams, and the hybrid flagged 65.7\% of these vouchers at creation and 53.4\% at cash-out. By comparison, ordinary legitimate vouchers had false-alarm rates of 0.73\% and 0.42\%. The low overall false positive rate therefore concealed a much greater burden for customers making legitimate emergency payments. This overlap was central to the problem being investigated: a suspicious pattern could justify closer review without revealing whether the customer had a valid reason for the payment.
+The legitimate scenarios showed the other side of this difficulty. Emergency payments deliberately shared behaviours such as unusual amounts and recent account changes with scams, and the hybrid flagged 65.7\% of these vouchers at creation and 53.4\% at redemption. By comparison, ordinary legitimate vouchers had false-alarm rates of 0.73\% and 0.42\%. The low overall false positive rate therefore concealed a much greater burden for customers making legitimate emergency payments. This overlap was central to the problem being investigated: a suspicious pattern could justify closer review without revealing whether the customer had a valid reason for the payment.
 
 \FloatBarrier\subsection{Prototype demonstration}
 
@@ -159,7 +159,7 @@ The interface reused the same hybrid scores and alert thresholds as the evaluati
 
 \FloatBarrier\subsection{Interpretation and limitations}
 
-The findings address the main research question by showing that behavioural risk scoring identified a share of the simulated scam-associated vouchers at both creation and cash-out. The hybrid had the highest test F1 among the five approaches, but still missed almost half of the scams. Its stronger results on prominent warning patterns and weaker results on subtle scams show the limits of the detection demonstrated here. Behavioural scoring supplied a basis for raising suspicion, while the results did not support treating every alert as confirmed fraud.
+The findings address the main research question by showing that behavioural risk scoring identified a share of the simulated scam-associated vouchers at both creation and redemption. The hybrid had the highest test F1 among the five approaches, but still missed almost half of the scams. Its stronger results on prominent warning patterns and weaker results on subtle scams show the limits of the detection demonstrated here. Behavioural scoring supplied a basis for raising suspicion, while the results did not support treating every alert as confirmed fraud.
 
 For the question of relevant indicators, the EDA showed differences in amounts, recent limit changes and redemption timing, together with overlap in legitimate behaviour. These observations help explain why combinations of indicators were considered in the prototype. They do not establish a ranking of feature importance, because the evaluation did not measure the effect of removing individual features. For the comparison of scoring approaches, the hybrid offered the better F1 at both stages, while rules remained more precise. Its value therefore lay in detecting more scams while accepting more false alerts, rather than improving every measure at once.
 

@@ -13,7 +13,7 @@ from core_evaluation import fingerprint
 DATA = ROOT / 'data/synthetic'
 REPORT = ROOT / 'report/core'
 st.set_page_config(page_title='Cardless Risk Monitor', page_icon='🛡️', layout='wide')
-DISPLAY_NAMES = {'score_time': 'Scored at', 'created_at': 'Created at', 'redeemed_at': 'Cashed out at',
+DISPLAY_NAMES = {'score_time': 'Scored at', 'created_at': 'Created at', 'redeemed_at': 'Redeemed at',
                  'voucher_id': 'Voucher', 'customer_id': 'Customer', 'amount': 'Amount (R)', 'risk': 'Risk score',
                  'band': 'Band', 'alert': 'Alert', 'rule_indicators': 'Rule indicators',
                  'scenario_type': 'Simulation scenario', 'is_scam': 'Simulated scam',
@@ -59,7 +59,7 @@ try:
 except ValueError as exc:
     st.error(str(exc)); st.stop()
 
-stage_label = st.sidebar.radio('Scoring point', ['A: voucher creation', 'B: cash-out'])
+stage_label = st.sidebar.radio('Scoring point', ['A: voucher creation', 'B: voucher redemption'])
 stage = stage_label[0]
 part = vouchers[vouchers.stage == stage].copy()
 selected = meta['stages'][stage]
@@ -95,7 +95,7 @@ with customer:
         if stage == 'B': cols.insert(2, 'redeemed_at')
         if truth: cols += ['scenario_type']
         st.dataframe(history[cols].rename(columns=DISPLAY_NAMES), hide_index=True, width='stretch')
-        st.caption('Only scored vouchers up to the selected day are shown. Cash-out dates are hidden in the creation view.')
+        st.caption('Only scored vouchers up to the selected day are shown. Redemption dates are hidden in the creation view.')
         if st.checkbox('Show recent account events (previous seven days)', value=False):
             path = DATA/'events_log.csv'
             if path.exists():

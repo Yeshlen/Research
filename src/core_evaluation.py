@@ -19,7 +19,7 @@ def load_data(root):
 
 
 def split_stage(df, stage, start_date):
-    """Half-open day ranges: [0,90), [90,120), [120,180). B uses cash-out time."""
+    """Half-open day ranges: [0,90), [90,120), [120,180). B uses redemption time."""
     if stage not in ('A', 'B'):
         raise ValueError('stage must be A or B')
     if stage == 'B':

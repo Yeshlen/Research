@@ -82,7 +82,7 @@ scam:
   fast_redeem_median_min: 10
   fast_redeem_sigma: 0.6
   slow_redeem_median_min: 60
-  p_far_redeem: 0.5            # fraudster cash-out point in another metro
+  p_far_redeem: 0.5            # fraudster redemption point in another metro
   p_night: 0.08
   p_device_change: 0.05        # vishing victims normally use their own phone
   flags:                       # P(red flag) per scam type; no type fires every flag

@@ -9,7 +9,7 @@ Run the three notebooks in numerical order using the repository environment. The
 ## Periods and choices
 
 - Fitting: days 0–89; validation: 90–119; test: 120–179.
-- Stage A uses creation time; Stage B includes redeemed vouchers and uses cash-out time. Both use half-open date ranges; events on a boundary enter the later period.
+- Stage A uses creation time; Stage B includes redeemed vouchers and uses redemption time. Both use half-open date ranges; events on a boundary enter the later period.
 - Features use preceding customer events. Model parameters and standardisation are fitted only in the fitting period. LOF and SVM retain their existing sample caps (20,000 and 10,000).
 - Isolation Forest: 300 trees, 256 observations per tree. LOF neighbours: 20, 50, 100, 200. SVM nu: 0.01, 0.05, 0.1, 0.2; RBF kernel.
 - Each candidate uses its highest-validation-F1 threshold. Threshold ties choose the higher threshold; equal model-setting results keep the first candidate listed. Equal anomaly-family results prefer IF, LOF, then SVM.
@@ -23,7 +23,7 @@ The dashboard displays saved test scores, uses the scoring date for filtering, a
 
 Tables, PNG/PDF plots and run metadata: `report/core/`. Locally saved fitted models: `report/core/models/` (ignored by Git). Dashboard records: `data/synthetic/core_scored_vouchers.csv` and `core_dashboard_meta.json` (also ignored). Run notebook 02 before 03 if the fitted-model file is absent. A fingerprint prevents use of models/results after data, configuration or fitting code changes.
 
-Simulator seed: 42; model/subsample seed: 0. The generated data is not committed. Use the same configuration and software environment when reproducing the run. The existing dataset and previous results were already examined during development; this is a revised evaluation, not a new unseen dataset. Stage populations differ, so changes between stages cannot be attributed solely to adding cash-out features.
+Simulator seed: 42; model/subsample seed: 0. The generated data is not committed. Use the same configuration and software environment when reproducing the run. The existing dataset and previous results were already examined during development; this is a revised evaluation, not a new unseen dataset. Stage populations differ, so changes between stages cannot be attributed solely to adding redemption features.
 
 ## Earlier work
 

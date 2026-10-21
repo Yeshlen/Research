@@ -29,8 +29,8 @@ RULES = [
     ("long_session", 10, "A", lambda d: (d.secs_since_login >= 300) | (d.screens_before_create >= 6),
      "long or heavily navigated session (possible coaching)"),
     ("night", 5, "A", lambda d: d.is_night == 1, "created at night"),
-    ("fast_cashout", 20, "B", lambda d: d.redeem_delay_min < 15, "cashed out within 15 minutes"),
-    ("far_cashout", 15, "B", lambda d: d.redeem_dist_usual_km >= 50, "cashed out 50km+ from usual area"),
+    ("fast_redemption", 20, "B", lambda d: d.redeem_delay_min < 15, "redeemed within 15 minutes"),
+    ("far_redemption", 15, "B", lambda d: d.redeem_dist_usual_km >= 50, "redeemed 50km+ from usual area"),
 ]
 
 STAGE_A_FEATURES = [

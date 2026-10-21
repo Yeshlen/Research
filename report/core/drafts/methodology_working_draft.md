@@ -31,7 +31,7 @@ Python, NumPy and pandas were used for simulation and data processing, scikit-le
 
 The study used synthetic banking activity because no real customer transaction dataset was available for this research. Rather than generating independent transaction rows, the simulator represented customers with their own habits and produced their activity over time. This was necessary because features such as a customer's usual voucher amount or whether a recipient had been used before required an actual sequence of earlier events.
 
-A seeded, rule-based simulation was used to create this history. Each customer generated their own banking events, including app sessions, account changes, voucher creation and redemption. Customers were simulated independently, so the implementation did not represent transfers between customer agents or a network of fraudsters. The focus was the behaviour surrounding a cardless withdrawal from the sending customer's perspective.
+A seeded, rule-based simulation was used to create this history. Each customer generated their own banking events, including app sessions, account changes, voucher creation and redemption. Voucher redemption refers to the recipient withdrawing the funds using the voucher. Customers were simulated independently, so the implementation did not represent transfers between customer agents or a network of fraudsters. The focus was the behaviour surrounding a cardless withdrawal from the sending customer's perspective.
 
 ### Customer profiles and legitimate behaviour
 
@@ -48,7 +48,7 @@ The simulator created 20,000 customers across four segments: students, salaried 
 
 Each customer also received a home location, account opening date, preferred activity time and recurring recipients. Payday, weekend and December multipliers changed voucher frequency across the observation period, which covered 180 days from 1 July to 27 December 2025. Scam episodes were introduced only from day 30, allowing an initial period for customer history to develop.
 
-Legitimate activity included ordinary voucher use and three unusual episodes: an emergency payment, use after a new phone was registered, and a payment redeemed while travelling. Ordinary activity could also involve new recipients, self-sends, multiple vouchers and quick cash-outs. These cases were included because a legitimate payment may display the same individual indicators as a scam. The scoring methods therefore needed to assess combinations of behaviour, rather than assume that every unusual action was fraudulent.
+Legitimate activity included ordinary voucher use and three unusual episodes: an emergency payment, use after a new phone was registered, and a payment redeemed while travelling. Ordinary activity could also involve new recipients, self-sends, multiple vouchers and quick redemptions. These cases were included because a legitimate payment may display the same individual indicators as a scam. The scoring methods therefore needed to assess combinations of behaviour, rather than assume that every unusual action was fraudulent.
 
 ### Product rules
 
@@ -69,7 +69,7 @@ These settings defined a generic voucher product rather than reproducing one ban
 
 ### Scam scenarios and labels
 
-Five scam scenarios were implemented: classic, self-send, limit raise, split vouchers and subtle. The classic scenario combined possible changes in recipient, amount and cash-out behaviour. The self-send scenario represented a customer being instructed to create a voucher for their own number and disclose its details, as described in Standard Bank's Instant Money scam warning ([Standard Bank, n.d.-a](https://www.standardbank.co.za/southafrica/personal/products-and-services/security-centre/bank-safely/scams)). SABRIC's account of social engineering in banking fraud provided the wider context for modelling transactions initiated by manipulated customers ([SABRIC, 2025](https://www.sabric.co.za/wp-content/uploads/2025/09/CRIME-STATISTICS-REPORT-2024.pdf)).
+Five scam scenarios were implemented: classic, self-send, limit raise, split vouchers and subtle. The classic scenario combined possible changes in recipient, amount and redemption behaviour. The self-send scenario represented a customer being instructed to create a voucher for their own number and disclose its details, as described in Standard Bank's Instant Money scam warning ([Standard Bank, n.d.-a](https://www.standardbank.co.za/southafrica/personal/products-and-services/security-centre/bank-safely/scams)). SABRIC's account of social engineering in banking fraud provided the wider context for modelling transactions initiated by manipulated customers ([SABRIC, 2025](https://www.sabric.co.za/wp-content/uploads/2025/09/CRIME-STATISTICS-REPORT-2024.pdf)).
 
 The remaining scenarios varied the warning pattern. Limit-raise scams included an instruction to increase the sending limit, split scams attempted several vouchers within one session, and subtle scams used less pronounced amount and redemption indicators. Their numerical probabilities were researcher-set assumptions: the public warnings supported the general attack pattern, but did not establish how often each indicator would occur. Flags were sampled according to the scenario, so a scam did not necessarily display every warning sign.
 
@@ -79,15 +79,15 @@ Each voucher received a binary ground-truth label: scam if it originated in a sc
 
 Before modelling, the records were checked against the product constraints and the information needed for scoring. The checks covered amount increments, current and maximum limits, daily and monthly totals, redemption timing, missing labels and history consistency. Duplicate voucher identifiers and agreement between feature labels and the truth file were also checked, so that evaluation would not rely on repeated or incorrectly labelled records.
 
-EDA then examined whether legitimate and scam vouchers differed on the behaviours represented in the features. It compared amounts, cash-out delays and selected warning indicators using percentages within each class. Class comparisons used the fitting and validation periods, while overall counts described the full observation window. This separated the examination of earlier behaviour from the later assessment of model performance. The resulting dataset and EDA findings are presented in the Results and discussion chapter.
+EDA then examined whether legitimate and scam vouchers differed on the behaviours represented in the features. It compared amounts, redemption delays and selected warning indicators using percentages within each class. Class comparisons used the fitting and validation periods, while overall counts described the full observation window. This separated the examination of earlier behaviour from the later assessment of model performance. The resulting dataset and EDA findings are presented in the Results and discussion chapter.
 
 ## 5.4 Scoring points and prediction task
 
 The unit of analysis was one cardless withdrawal voucher. Each method assigned a score indicating how suspicious the voucher appeared, and an alert threshold converted that score into a decision to flag or leave it unflagged. The target was a voucher associated with a simulated scam; the features did not directly reveal whether a customer was being manipulated during a phone call.
 
-Two scoring points were used because suspicious behaviour could become visible at different stages. Stage A scored the voucher at creation using its amount, recipient, session, account changes and earlier customer activity. This represented an opportunity to warn the customer or delay activation when the transaction was submitted. Stage B scored redeemed vouchers using the stored creation features together with cash-out information, including delay, location and channel. It represented a possible second intervention point before payout, although the experiment used recorded redemption events rather than executing a payment hold.
+Two scoring points were used because suspicious behaviour could become visible at different stages. Stage A scored the voucher at creation using its amount, recipient, session, account changes and earlier customer activity. This represented an opportunity to warn the customer or delay activation when the transaction was submitted. Stage B scored redeemed vouchers using the stored creation features together with redemption information, including delay, location and channel. It represented a possible second intervention point before payout, although the experiment used recorded redemption events rather than executing a payment hold.
 
-To preserve the information available at each point, the feature extractor processed each customer's events chronologically. Creation features were calculated before adding the current voucher to history, and usual cash-out behaviour was calculated from earlier redemptions before including the current one. Stage B retained the creation-time values of Stage A features, making the extra information available at cash-out explicit.
+To preserve the information available at each point, the feature extractor processed each customer's events chronologically. Creation features were calculated before adding the current voucher to history, and usual redemption behaviour was calculated from earlier redemptions before including the current one. Stage B retained the creation-time values of Stage A features, making the extra information available at redemption explicit.
 
 ## 5.5 Feature engineering
 
@@ -103,12 +103,12 @@ The extractor produced 34 fields: 27 available at creation and seven relating to
 | Session behaviour | 2 | Time since login; screens viewed |
 | Timing | 5 | Deviation from usual hour; night indicator |
 | Account changes and age | 6 | Limit, device and password changes; account age |
-| Redemption | 7 | Delay; distance from the usual area; cash-out channel |
+| Redemption | 7 | Delay; distance from the usual area; redemption channel |
 | **Total** | **34** | 27 creation fields and seven redemption fields |
 
 *Table 5.3: Extracted feature groups.*
 
-Historical calculations used only activity preceding the relevant event. For example, the amount ratio compared the voucher with the customer's mean amount over the preceding 90 days, while velocity features counted earlier vouchers within 24-hour, seven-day and session windows. Usual creation time used a circular mean, so activity around midnight was treated as close together. The usual cash-out area was the mean latitude and longitude of earlier redemptions, with the home location used when redemption history was unavailable.
+Historical calculations used only activity preceding the relevant event. For example, the amount ratio compared the voucher with the customer's mean amount over the preceding 90 days, while velocity features counted earlier vouchers within 24-hour, seven-day and session windows. Usual creation time used a circular mean, so activity around midnight was treated as close together. The usual redemption area was the mean latitude and longitude of earlier redemptions, with the home location used when redemption history was unavailable.
 
 Customers with no earlier vouchers required explicit starting values. Amount ratios started at 1 where no previous average or maximum existed, and earlier-voucher counts remained zero. Time-since-event features used a 365-day default and cap when an event had not been recorded. These values allowed the models to score customers with limited history, while the history count distinguished them from customers with established activity.
 
@@ -122,7 +122,7 @@ The experiment compared a rule-based score, three anomaly detection models and o
 
 ### Rule-based score
 
-The baseline used 13 weighted rules: 11 available at creation and two added at cash-out. Creation rules considered an unfamiliar recipient, a recipient added in the session, an amount at least three times the customer's recent average, an amount near the daily limit, a recent limit increase, a new device, first cardless use, multiple vouchers, recent velocity, a long session and night-time activity. Redemption rules considered cash-out in less than 15 minutes and a location at least 50 km from the usual area. These conditions expressed the proposed warning patterns as a checklist that could be applied consistently to every voucher.
+The baseline used 13 weighted rules: 11 available at creation and two added at redemption. Creation rules considered an unfamiliar recipient, a recipient added in the session, an amount at least three times the customer's recent average, an amount near the daily limit, a recent limit increase, a new device, first cardless use, multiple vouchers, recent velocity, a long session and night-time activity. Redemption rules considered redemption in less than 15 minutes and a location at least 50 km from the usual area. These conditions expressed the proposed warning patterns as a checklist that could be applied consistently to every voucher.
 
 Each triggered rule added fixed points, with the total capped at 100. For example, an unfamiliar recipient added 20 points, an amount at least 80% of the daily limit added 15, and a recent limit increase added 20. The weights were hand-set design choices and were not fitted to the labels. The proposal's Low (0--39), Medium (40--69), High (70--89) and Critical (90--100) bands remained available for describing the raw rule score, while the comparison used an alert threshold selected on validation data. Each triggered rule also produced a short explanation, allowing the dashboard to show which checklist conditions were present.
 
@@ -154,9 +154,9 @@ The scoring methods were assessed using three time-ordered periods. The first 90
 | Validation: 29 September--28 October | 90--119 | 34,748 | 33,862 |
 | Test: 29 October--27 December | 120--179 | 83,947 | 81,208 |
 
-*Table 5.4: Evaluation periods in 2025. Stage A follows creation time; Stage B follows cash-out time.*
+*Table 5.4: Evaluation periods in 2025. Stage A follows creation time; Stage B follows redemption time.*
 
-Period membership followed the point at which the score could be calculated: creation time for Stage A and cash-out time for Stage B. A voucher created before a boundary but redeemed afterwards could therefore enter different periods at the two stages. This prevented later cash-out information from entering an earlier fitting period. Customer profiles continued to update from preceding events, including earlier events within the test period, while model parameters and standardisation were not refitted on test records.
+Period membership followed the point at which the score could be calculated: creation time for Stage A and redemption time for Stage B. A voucher created before a boundary but redeemed afterwards could therefore enter different periods at the two stages. This prevented later redemption information from entering an earlier fitting period. Customer profiles continued to update from preceding events, including earlier events within the test period, while model parameters and standardisation were not refitted on test records.
 
 Validation was used to choose settings and the score at which an alert would be raised. LOF's neighbourhood size was selected from 20, 50, 100 and 200, while One-Class SVM's nu was selected from 0.01, 0.05, 0.1 and 0.2. For each candidate, the threshold giving the highest validation F1 was identified, and the candidate with the highest resulting F1 was retained. Tied thresholds favoured the higher threshold, while tied settings retained the first listed candidate. The anomaly family with the highest validation F1 was then used in the hybrid, whose alert threshold was selected in the same way. These decisions were saved before test scoring, so test results did not determine the reported settings or thresholds.
 
@@ -180,7 +180,7 @@ The synthetic dataset allowed the scoring approaches to be compared under contro
 
 Labels also had a role beyond final testing. They were excluded from anomaly fitting but used for validation selection and class-based analysis during dataset development. Earlier exploratory findings, including a shallow-tree diagnostic, had informed changes to the simulator. Because the dataset had already been examined during development, the test period cannot be treated as untouched throughout the research process.
 
-Finally, the two scoring stages differed in both available information and eligible records: Stage B included only recorded redemptions and assigned periods by cash-out time. Their comparison therefore did not isolate the effect of adding redemption features alone. The evaluation measured detection and alert behaviour in one configured simulation, while customer responses, financial loss prevented and operational processing speed remained outside its scope.
+Finally, the two scoring stages differed in both available information and eligible records: Stage B included only recorded redemptions and assigned periods by redemption time. Their comparison therefore did not isolate the effect of adding redemption features alone. The evaluation measured detection and alert behaviour in one configured simulation, while customer responses, financial loss prevented and operational processing speed remained outside its scope.
 
 ## References
 

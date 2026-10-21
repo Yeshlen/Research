@@ -27,7 +27,7 @@ def test_threshold_matches_exhaustive_validation_search():
     with pytest.raises(ValueError): choose_threshold([0,0], [.2,.4])
 
 
-def test_cashout_time_does_not_enter_earlier_period():
+def test_redemption_time_does_not_enter_earlier_period():
     start = pd.Timestamp('2025-07-01')
     df = pd.DataFrame({'voucher_id':[1,2,3,4], 'redeemed':[1,1,1,0],
         'created_at':[start+pd.Timedelta(days=x) for x in (89,119,120,10)],

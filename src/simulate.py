@@ -271,7 +271,7 @@ class Simulator:
             pre.append(("change_limit", cfg["product"]["max_daily_limit"]))
         limit_guess = cfg["product"]["max_daily_limit"] if flags["limit_raise"] else c["_limit_hint"]
 
-        # Fraudster cash-out point: another metro, or a random spot in the victim's metro
+        # Fraudster redemption point: another metro, or a random spot in the victim's metro
         if rng.random() < sc["p_far_redeem"]:
             cash_loc, _ = self.random_metro_point(exclude=c["metro_i"])
         else:
