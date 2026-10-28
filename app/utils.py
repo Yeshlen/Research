@@ -15,7 +15,7 @@ from core_evaluation import fingerprint, load_data, split_stage
 from demo_scoring import score_vouchers
 from deployment_data import ensure_dataset, ensure_runtime
 from session_examples import session_examples
-from models import STAGE_A_FEATURES, STAGE_B_FEATURES
+from models import RULES, STAGE_A_FEATURES, STAGE_B_FEATURES
 
 MODEL_NAMES = ["Rules", "Isolation Forest", "LOF", "One-Class SVM", "Hybrid"]
 MODEL_NOTES = {
@@ -190,7 +190,7 @@ def alert_dialog(decisions):
         st.rerun()
 
 
-def show_performance(results, model_name, stage):
+def show_performance(results, model_name, stage, selected):
     row = results[(results.stage == stage) & (results.model == model_name)].iloc[0]
     st.subheader("Saved test performance")
     cols = st.columns(4)
@@ -209,8 +209,27 @@ def show_performance(results, model_name, stage):
     fig.tight_layout()
     st.pyplot(fig, width="content")
     plt.close(fig)
-    st.caption("Fixed test-period results from notebook 03. Generated examples are not included in these metrics.")
     st.caption("Precision: how many alerts were scams. Recall: how many scams were detected. F1 balances both.")
+
+    if model_name == "Rules":
+        st.subheader("Rules and points")
+        labels = {
+            "multi_in_session": "Second or later voucher in the same session",
+            "velocity_24h": "Third or later voucher within 24 hours",
+            "long_session": "At least 5 minutes since login or 6 screens viewed",
+            "fast_redemption": "Redeemed in under 15 minutes",
+        }
+        st.table(pd.DataFrame([
+            {"Rule": labels.get(name, reason[0].upper() + reason[1:]),
+             "Points": points, "Available from": "Creation" if rule_stage == "A" else "Redemption"}
+            for name, points, rule_stage, _, reason in RULES
+        ]))
+        st.caption("Matching rules add points, capped at 100. Creation rules also apply at redemption. Points were manually chosen.")
+    elif model_name == "Hybrid":
+        st.subheader("Hybrid formula")
+        st.latex(r"H = 0.5 \times \frac{R}{100} + 0.5 \times A")
+        st.write(f"R is the Rule Based score (0–100). A is the {selected['hybrid_anomaly']} anomaly percentile (0–1).")
+        st.caption("The dashboard displays H × 100 as the risk score.")
 
 
 def show_model_page(model_name):
@@ -239,7 +258,7 @@ def show_model_page(model_name):
             if source == "Generated examples" and stage == "A" and int(record.iloc[0].redeemed) == 1:
                 st.button("Simulate redemption", help="Switch to scoring with redemption information.", on_click=lambda: st.session_state.update(scoring_stage="B"))
     with performance:
-        show_performance(results, model_name, stage)
+        show_performance(results, model_name, stage, selected)
 
 
 def generation_start(bundle):
