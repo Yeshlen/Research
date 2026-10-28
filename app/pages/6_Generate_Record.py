@@ -1,9 +1,10 @@
-"""Generate isolated examples, persist them separately, and score with fixed models."""
+"""Generate isolated examples, keep them in this session, and score with fixed models."""
 import pandas as pd
 import streamlit as st
 from utils import MODEL_NAMES, ROOT, alert_dialog, generation_start, load_resources, model_label, page_setup, show_result
 from demo_scoring import score_vouchers
-from demo_simulation import (LEGIT_SCENARIOS, SCAM_SCENARIOS, generate_example, load_examples, save_example)
+from session_examples import remember_example, session_examples
+from demo_simulation import (LEGIT_SCENARIOS, SCAM_SCENARIOS, generate_example)
 
 page_setup("Generate Record")
 bundle, _, _ = load_resources()
@@ -32,8 +33,8 @@ if generate_clicked:
     try:
         with st.spinner("Copying an earlier customer history and generating new events…"):
             features, events = generate_example(ROOT, actual_kind, scenario)
-            save_example(ROOT, features, events)
         decisions = score_vouchers(features, bundle["stages"]["A"], model_name, "A")
+        remember_example(st.session_state, features)
         st.session_state["simulation_result"] = dict(features=features, events=events,
                                                    decisions=decisions, stage="A", model=model_name)
         generation_succeeded = True
@@ -84,9 +85,9 @@ if latest:
         alert_dialog(alerts)
 
 st.divider()
-examples = load_examples(ROOT)
+examples = session_examples(st.session_state)
 if not examples.empty:
-    st.subheader("Saved generated vouchers")
+    st.subheader("Generated vouchers in this session")
     display = examples[["simulation_id", "voucher_id", "customer_id", "created_at", "amount", "scenario_type", "is_scam"]].copy()
     display["scenario_type"] = display.scenario_type.str.replace("_", " ")
     display["is_scam"] = display.is_scam.map({1: "Scam", 0: "Legitimate"})
@@ -96,4 +97,4 @@ if not examples.empty:
     st.dataframe(display, hide_index=True, width="stretch")
     st.download_button("Download generated voucher CSV", examples.to_csv(index=False).encode(),
                        file_name="generated_vouchers.csv", mime="text/csv", help="Download only the separately generated vouchers.")
-st.caption("Generated examples are saved separately. They never update the original customer history, research dataset or test-performance tables.")
+st.caption("Generated examples stay in your current session. Download them to keep a copy; they are cleared when the session ends. Original customer histories and test results stay unchanged.")

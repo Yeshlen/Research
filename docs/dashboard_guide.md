@@ -38,18 +38,13 @@ The shared event recorder accepts optional starting state for this purpose. Its 
 
 Each new example starts from the original files again. Earlier generated examples never become history for later generations. Within one episode, the new vouchers update its temporary profile in event order.
 
-## Saved files
+## Generated examples
 
-New examples are written only under the ignored local `data/demo/` folder:
+The dashboard stores generated voucher features in the current visitor's session, separately from other visitors. They remain available across model pages during that session and can be downloaded as CSV. Refreshing or ending a session can clear them. Original research files, fitted models and test tables are read only.
 
-| File | Contents |
-|---|---|
-| `generated_vouchers.csv` | New voucher features, scenario truth, example ID, generation time and history checkpoint |
-| `generated_events.csv` | Only the new banking events for those examples |
+The reusable `save_example` function in `src/demo_simulation.py` is still available for local scripts and tests; the public dashboard does not call it or read shared `data/demo/` files.
 
-The original research CSVs, fitted model bundle and evaluation tables are read only. CSV storage is intended for this local, single-user prototype. The generated-voucher download preserves the full feature columns.
-
-Redemption events/features are planned by the generator and saved for later demonstration, just as in the original simulation. Creation scoring never uses them. Selecting redemption scoring or pressing **Simulate redemption** reveals and scores that later stage. Some vouchers have no recorded redemption within the observation window and remain eligible only at creation.
+Redemption information is planned by the generator for later demonstration. Creation scoring never uses it. Selecting redemption scoring or pressing **Simulate redemption** reveals and scores that stage. Some vouchers have no redemption within the observation window and can only be scored at creation.
 
 ## Alerts
 
@@ -65,6 +60,7 @@ The simulated truth is shown separately. This lets users see correct alerts, mis
 |---|---|
 | `app/dashboard.py` | Home page and existing launch entry point |
 | `app/pages/` | Simple model, simulation and comparison pages |
+| `app/session_examples.py` | Visitor-specific generated voucher storage |
 | `app/utils.py` | Shared loading, voucher selection, results and modal |
 | `src/demo_simulation.py` | Independent customer continuation and separate CSV storage |
 | `src/demo_scoring.py` | Saved-model scoring, without labels or fitting |

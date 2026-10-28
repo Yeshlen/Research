@@ -1,0 +1,30 @@
+{
+  "url": "https://github.com/Yeshlen/Research/releases/download/demo-data-v1/cardless-dataset-seed42-v1.tar.gz",
+  "sha256": "dbfc6a346dc91b8e2b640d267c83a03d7db6959c3588c1c07c99a6ebbb1e7800",
+  "files": {
+    "cardless_features.csv": {
+      "sha256": "e38c00bb58587ce8ca80b565f76e1f8d2dfc3e8fa75d1348fae81c6db344e2a1",
+      "bytes": 38507604
+    },
+    "customers.csv": {
+      "sha256": "f7db8cafff43ef9b97f77ef3aba4f76a1d48820d72fc799878bda731558168fe",
+      "bytes": 1028084
+    },
+    "customers_latent.csv": {
+      "sha256": "0abccc45ab4607a3268a73676492a7ec21f390dd682715f70b1d91985bb9ea83",
+      "bytes": 1022755
+    },
+    "events_log.csv": {
+      "sha256": "66edb26ed06236bee5211c8f6df62d06a72aa4f13ddc3efe77cf85a0706efe6a",
+      "bytes": 132194676
+    },
+    "dataset_metadata.json": {
+      "sha256": "bf7189467f46aa591c0433579e4f516cbbbf28fc33c6828fec89510228bd34dd",
+      "bytes": 4397
+    },
+    "vouchers_truth.csv": {
+      "sha256": "eb71a2b437a0788d6f2c500e6b7dc30e35352c2c22f2d0ba394f6bf44612127a",
+      "bytes": 5232656
+    }
+  }
+}

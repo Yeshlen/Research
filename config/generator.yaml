@@ -3,7 +3,7 @@
 # p_ values are probabilities: 0.20 means a 20% chance.
 # Spread values control distributions, not hard minimum/maximum ranges.
 
-seed: 75  # Makes random generation repeatable.
+seed: 42  # Makes random generation repeatable.
 n_customers: 20000  # Number of fictional customers to create.
 start_date: "2025-07-01"  # First date of the simulated activity.
 days: 180  # Number of days to simulate.

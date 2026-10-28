@@ -13,7 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from core_evaluation import fingerprint, load_data, split_stage
 from demo_scoring import score_vouchers
-from demo_simulation import load_examples
+from deployment_data import ensure_dataset
+from session_examples import session_examples
 from models import STAGE_A_FEATURES, STAGE_B_FEATURES
 
 MODEL_NAMES = ["Rules", "Isolation Forest", "LOF", "One-Class SVM", "Hybrid"]
@@ -51,7 +52,19 @@ def _load_resources(signatures):
     return bundle, results, vouchers
 
 
+@st.cache_resource
+def _prepare_dataset():
+    ensure_dataset(ROOT)
+
+
 def load_resources():
+    try:
+        with st.spinner("Preparing the demonstration data…"):
+            _prepare_dataset()
+    except (OSError, ValueError) as exc:
+        st.error(f"The demonstration data could not be prepared: {exc}")
+        st.info("The dataset release must be publicly accessible. Reload the page to retry.")
+        st.stop()
     paths = [ROOT / "report/core/models/fitted_models.joblib",
              ROOT / "report/core/tables/model_comparison.csv", ROOT / "data/synthetic/cardless_features.csv",
              ROOT / "config/generator.yaml", ROOT / "src/models.py", ROOT / "src/core_evaluation.py",
@@ -100,7 +113,7 @@ def select_record(vouchers, stage, start_date):
         record = records.iloc[[int(number) - 1]].copy()
         st.caption(f"{len(records):,} eligible test vouchers. Changing this selection does not change the reported test metrics.")
     else:
-        records = load_examples(ROOT)
+        records = session_examples(st.session_state)
         if records.empty:
             st.info("Create an example on the Generate Record page first.")
             return None, source
@@ -114,7 +127,7 @@ def select_record(vouchers, stage, start_date):
                               format_func=lambda i: example_label(records.iloc[i]),
                               index=len(records) - 1, key=f"generated_choice_{stage}", help="Choose a previously generated voucher.")
         record = records.iloc[[chosen]].copy()
-        st.caption("Generated examples are stored separately and do not change customer histories or test results.")
+        st.caption("Generated examples belong to your current session and do not change customer histories or test results.")
     row = record.iloc[0]
     st.write(f"**Voucher {int(row.voucher_id)}** · Customer {int(row.customer_id)} · **R{row.amount:,.0f}**")
     st.caption(f"Created at {row.created_at}")

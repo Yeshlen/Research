@@ -34,7 +34,7 @@ python src/simulate.py --customers 10 --out data/simulator_demo
 python src/features.py --data data/simulator_demo
 ```
 
-Notebook 01 uses the same `simulator.generate_dataset` function when regeneration is enabled. The current configuration uses seed 75; existing saved evaluation results describe the earlier seed-42 dataset. Regenerating data requires rerunning model fitting and evaluation before comparing new results.
+Notebook 01 uses the same `simulator.generate_dataset` function when regeneration is enabled.
 
 ## Revised comparison
 
@@ -53,10 +53,20 @@ streamlit run app/dashboard.py
 pytest -q
 ```
 
-The dashboard has pages for Rules, Isolation Forest, LOF, One-Class SVM and Hybrid, plus model comparison and independent record generation. Each model can score an existing test voucher or a saved generated example. Run Simulation creates legitimate/scam activity (or a 50/50 random choice), scores it with fixed models and opens a review-alert modal when the saved threshold is crossed. Generated events and voucher features are stored separately under `data/demo/`; they never change the research history or saved test metrics. Creation and redemption remain separate scoring points. Rule indicators provide context for anomaly models, not internal model explanations. See `docs/dashboard_guide.md` for the workflow and limitations.
+The dashboard has pages for Rule Based, Isolation Forest, LOF, One-Class SVM and Hybrid, plus model comparison and independent record generation. Each model can score an existing test voucher or a generated example from their session. The outline dice button chooses a random test record from the current filter. Generate Record creates legitimate/scam activity (or a 50/50 random choice), scores it with fixed models and opens a review-alert modal when the saved threshold is crossed. Generated examples stay within each visitor's session and can be downloaded as CSV; they never change the research history or saved test metrics. Creation and redemption remain separate scoring points. Rule indicators provide context for anomaly models, not internal model explanations. See `docs/dashboard_guide.md` for the workflow and limitations.
 
 The notebooks are the main analysis workflow. Reusable Python modules remain in `src/` for simulation, feature extraction, scoring and checks; the application remains in `app/`.
 
 ## Earlier analyses
 
 Original extended evaluation scripts and documentation are preserved under `archive/extended_evaluation/`. Figures/tables outside `report/core/` and earlier LaTeX report fragments describe the older experiment. They are historical, not outputs of the revised five-approach evaluation. See `docs/eda_findings.md` and `docs/model_results.md` for the new run.
+
+## Streamlit Community Cloud
+
+Use repository `Yeshlen/Research`, branch `main`, entry point `app/dashboard.py`, and Python **3.14** in Advanced settings. `requirements.txt` pins the versions used by the saved models. No API keys or paid services are needed for the public demo.
+
+When the required files are absent, the app downloads the original synthetic dataset from the `demo-data-v1` GitHub Release. `deployment/data_release.json` records the download URL and archive/file checksums. The repository and release must be public for anonymous Community Cloud downloads. Existing local data is reused without downloading or overwriting it. The bundled dataset and existing reported metrics are unchanged.
+
+Generated examples stay in each visitor's session. Download the CSV before leaving to retain them. The app does not save visitors' generations to shared server CSVs. Community Cloud may sleep after inactivity, and the first visit may take longer while the app starts or downloads data.
+
+Deployment details: `docs/deployment.md`.
