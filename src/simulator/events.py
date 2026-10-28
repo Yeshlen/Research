@@ -34,15 +34,19 @@ class EventRecorder:
         ))
 
 
-def record_customer_events(customer, sessions, config, rng, counters, event_rows, truth_rows, start_date):
+def record_customer_events(customer, sessions, config, rng, counters, event_rows, truth_rows, start_date,
+                           initial_state=None):
     product = config["product"]
     window_end = config["days"] * MINUTES_PER_DAY
-    current_limit = customer["starting_limit"]
+    # The dashboard can branch from a copied history. Ordinary dataset runs start empty.
+    initial_state = initial_state or {}
+    current_limit = initial_state.get("current_limit", customer["starting_limit"])
     device_id = f"D{next_id(counters, 'device')}"
+    device_id = initial_state.get("device_id", device_id)
     recorder = EventRecorder(customer["customer_id"], device_id, event_rows)
-    daily_spending = {}
-    monthly_spending = {}
-    used_recipients = set()
+    daily_spending = dict(initial_state.get("daily_spending", {}))
+    monthly_spending = dict(initial_state.get("monthly_spending", {}))
+    used_recipients = set(initial_state.get("used_recipients", set()))
 
     sessions_in_order = sorted(sessions, key=lambda session: session["start_minute"])
     for session in sessions_in_order:

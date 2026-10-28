@@ -25,6 +25,12 @@ Tables, PNG/PDF plots and run metadata: `report/core/`. Locally saved fitted mod
 
 The saved evaluation used simulator seed 42 and model/subsample seed 0. The current generator configuration uses seed 75; it does not alter existing CSVs or results until regeneration is explicitly run. The generated data is not committed. Use the same configuration and software environment when reproducing the run. The existing dataset and previous results were already examined during development; this is a revised evaluation, not a new unseen dataset. Stage populations differ, so changes between stages cannot be attributed solely to adding redemption features.
 
+## Saved-result checks and dataset provenance
+
+The saved-result fingerprint hashes the parsed YAML values, so comments, key order and formatting do not invalidate a run. Actual setting values, feature CSV contents and fitting code still do. Notebook outputs are excluded from this check.
+
+When notebook 01 generates data, it records the generation seed, configuration and feature-file hash in the ignored local `data/synthetic/dataset_metadata.json`. Notebook 02 uses matching dataset metadata for the actual simulator seed and separately records the currently configured seed. If metadata is missing or belongs to a different feature file, the generation seed is reported as unknown rather than inferred from edited settings. The current existing dataset is verified as seed 42; the current YAML specifies seed 75 for a future regeneration.
+
 ## Earlier work
 
 `archive/extended_evaluation/` preserves the former Python evaluation entry points and their notes. Earlier plots and tables outside `report/core/` are historical and must not be combined with the revised results. Autoencoder, supervised benchmark, bootstrap, learning curves and sensitivity/ablation experiments are excluded from this workflow.

@@ -1,5 +1,5 @@
 {
-  "fingerprint": "1be979d24e77184138c2a07f0c8c433e250de062e1ec3d2126d873307d868f6f",
+  "fingerprint": "ce3fcb84ed38c0596f4a2f5fb3b062ff9597024be51f0794018d36bec8c740a4",
   "protocol": "Fit days 0\u201389; validate 90\u2013119; test 120\u2013179; periods use the scoring time.",
   "stages": {
     "A": {
@@ -70,7 +70,9 @@
     "streamlit": "1.65.0",
     "python": "3.14.3"
   },
-  "fitted_at": "2026-10-21T00:18:57.456890+00:00",
+  "fitted_at": "2026-10-22T10:41:03.684589+00:00",
   "model_seed": 0,
-  "simulator_seed": 42
+  "simulator_seed": 42,
+  "configured_simulator_seed": 75,
+  "dataset_sha256": "e38c00bb58587ce8ca80b565f76e1f8d2dfc3e8fa75d1348fae81c6db344e2a1"
 }

@@ -77,3 +77,39 @@ def test_fitted_bundle_rejects_changed_input_but_ignores_notebook_outputs(tmp_pa
     (tmp_path/'data/synthetic/cardless_features.csv').write_text('different data')
     with pytest.raises(ValueError, match='Run notebook 02'):
         check_fitted_bundle(bundle, tmp_path)
+
+
+def test_fingerprint_ignores_yaml_comments_but_detects_value_changes(tmp_path):
+    import json
+    from core_evaluation import fingerprint
+    for name in ['data/synthetic/cardless_features.csv', 'src/models.py', 'src/core_evaluation.py']:
+        path = tmp_path/name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('original')
+    notebook = tmp_path/'notebooks/02_fit_models.ipynb'
+    notebook.parent.mkdir()
+    notebook.write_text(json.dumps({'cells': []}))
+    config = tmp_path/'config/generator.yaml'
+    config.parent.mkdir()
+    config.write_text('seed: 42\ndays: 180\n')
+    before = fingerprint(tmp_path)
+    config.write_text('# Explanation\ndays: 180 # Duration\nseed: 42 # Repeatable\n')
+    assert fingerprint(tmp_path) == before
+    config.write_text('seed: 75\ndays: 180\n')
+    assert fingerprint(tmp_path) != before
+
+
+def test_generation_seed_tracks_data_not_current_configuration(tmp_path):
+    from core_evaluation import dataset_metadata, save_dataset_metadata
+    data = tmp_path/'data/synthetic/cardless_features.csv'
+    data.parent.mkdir(parents=True)
+    data.write_text('voucher_id,amount\n1,500\n')
+    assert dataset_metadata(tmp_path)['simulator_seed'] is None
+    saved = save_dataset_metadata(tmp_path, {'seed': 42})
+    config = {'seed': 75}
+    assert dataset_metadata(tmp_path)['simulator_seed'] == 42
+    assert dataset_metadata(tmp_path)['feature_sha256'] == saved['feature_sha256']
+    data.write_text('voucher_id,amount\n1,900\n')
+    assert dataset_metadata(tmp_path)['simulator_seed'] is None
+    save_dataset_metadata(tmp_path, config)
+    assert dataset_metadata(tmp_path)['simulator_seed'] == 75

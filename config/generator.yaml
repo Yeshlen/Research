@@ -1,104 +1,140 @@
-# Synthetic cardless withdrawal simulator: all tunable parameters.
-# Every value here is either sourced (see `source:` comments) or a stated assumption.
-# Regenerating with the same seed and config gives an identical dataset.
+# Settings for the synthetic cardless-voucher simulator.
+# Behavioural probabilities are assumptions unless a source is stated.
+# p_ values are probabilities: 0.20 means a 20% chance.
+# Spread values control distributions, not hard minimum/maximum ranges.
 
-seed: 75
-n_customers: 20000
-start_date: "2025-07-01"
-days: 180                      # observation window (6 paydays + December festive period)
-warmup_days: 30                # no scam episodes injected before this day
-train_days: 120                # vouchers created before this day form the training split
+seed: 75  # Makes random generation repeatable.
+n_customers: 20000  # Number of fictional customers to create.
+start_date: "2025-07-01"  # First date of the simulated activity.
+days: 180  # Number of days to simulate.
+warmup_days: 30  # Earliest day on which scams may start.
+train_days: 120  # Legacy split at day 120; current evaluation uses 90/30/60.
 
-product:                       # generic South African cardless voucher product
-  default_daily_limit: 2500    # source: Nedbank cardless withdrawal FAQ (default R2 500)
-  max_daily_limit: 5000        # source: Standard Bank Instant Money T&Cs cl. 6.1; Absa CashSend; Nedbank FAQ
-  monthly_limit: 25000         # source: Standard Bank Instant Money T&Cs cl. 6.1; Absa CashSend
-  amount_step: 50              # source: Absa CashSend (R50 increments)
-  p_round_100: 0.6             # assumption: people prefer round hundreds
-  voucher_expiry_days: 30      # source: Absa CashSend, Nedbank FAQ
-  p_start_raised_limit: 0.12   # assumption: share of customers who already raised their limit before the window
-  p_raise_on_demand: 0.6       # assumption: a legit customer whose voucher exceeds the limit raises it in-session
+product:  # Sending limits, rounding and voucher validity.
+  default_daily_limit: 2500  # Starting daily limit (rand); source: Nedbank FAQ.
+  max_daily_limit: 5000  # Highest daily limit (rand); sources: Nedbank, Standard Bank, Absa.
+  monthly_limit: 25000  # Maximum sent per calendar month (rand); sources: Standard Bank, Absa.
+  amount_step: 50  # Smallest amount and allowed increment (rand); source: Absa.
+  p_round_100: 0.6  # Chance of rounding to R100 instead of R50.
+  voucher_expiry_days: 30  # Voucher lifetime in days; sources: Absa, Nedbank.
+  p_start_raised_limit: 0.12  # Chance a customer starts with the higher limit.
+  p_raise_on_demand: 0.6  # Chance an eligible legitimate payment raises the limit when needed.
 
-# share, median vouchers per month, median voucher amount (R), mean background app sessions per month
-segments:
-  student:   {share: 0.20, rate: 0.5, amount: 300, sessions: 10}
-  salaried:  {share: 0.45, rate: 0.8, amount: 800, sessions: 14}
-  informal:  {share: 0.20, rate: 1.2, amount: 600, sessions: 8}
-  pensioner: {share: 0.15, rate: 0.4, amount: 500, sessions: 5}
+segments:  # Starting profiles; customers vary around these settings.
+  student:
+    share: 0.2  # Chance of selecting this customer group.
+    rate: 0.5  # Base monthly voucher-session rate before variation/boosts.
+    amount: 300  # Base typical amount in rand; varied per customer.
+    sessions: 10  # Base monthly background-session parameter before scaling.
+  salaried:
+    share: 0.45  # Chance of selecting this customer group.
+    rate: 0.8  # Base monthly voucher-session rate before variation/boosts.
+    amount: 800  # Base typical amount in rand; varied per customer.
+    sessions: 14  # Base monthly background-session parameter before scaling.
+  informal:
+    share: 0.2  # Chance of selecting this customer group.
+    rate: 1.2  # Base monthly voucher-session rate before variation/boosts.
+    amount: 600  # Base typical amount in rand; varied per customer.
+    sessions: 8  # Base monthly background-session parameter before scaling.
+  pensioner:
+    share: 0.15  # Chance of selecting this customer group.
+    rate: 0.4  # Base monthly voucher-session rate before variation/boosts.
+    amount: 500  # Base typical amount in rand; varied per customer.
+    sessions: 5  # Base monthly background-session parameter before scaling.
 
-behaviour:
-  rate_sigma: 1.0              # log-normal spread of activity between customers -> long tail
-  max_monthly_rate: 20
-  amount_sigma: 0.5            # spread of typical amount between customers
-  within_amount_sigma: 0.35    # spread of one customer's amounts around their typical amount
-  payday_boost: 2.0            # source: SA payday cycle (25th to 1st); multiplier on voucher rate
-  weekend_boost: 1.3
-  december_boost: 1.5
-  pref_hour_mean: 13
-  pref_hour_sd: 3
-  hour_sd_within: 2
-  mean_extra_recipients: 1.5   # recipients = 1 + Poisson(this)
-  p_known_beta: [8, 2]         # Beta prior for P(send to an existing recipient)
-  p_self_send_beta: [1, 6]     # Beta prior for P(customer sends voucher to self)
-  p_recipient_other_city: 0.2  # recipient lives in another metro (family elsewhere)
-  p_late_joiner: 0.15          # account opened during the window
-  bg_sessions_scale: 0.3       # background sessions = segment sessions * this (keeps log size manageable)
-  p_device_change_per_month: 0.03
-  p_password_reset_per_month: 0.02
-  p_legit_limit_raise_per_month: 0.03
+behaviour:  # Variation between customers and calendar effects.
+  rate_sigma: 1.0  # Spread of customer activity rates; larger means more variation.
+  max_monthly_rate: 20  # Cap on the base monthly voucher-rate parameter.
+  amount_sigma: 0.5  # Spread of typical amounts between customers.
+  within_amount_sigma: 0.35  # Spread of one customer's individual voucher amounts.
+  payday_boost: 2.0  # Activity multiplier on days 25 to month-end and day 1; assumed size.
+  weekend_boost: 1.3  # Activity multiplier on Saturdays and Sundays.
+  december_boost: 1.5  # Activity multiplier during December.
+  pref_hour_mean: 13  # Centre of customer preferred hours (13 = 13:00).
+  pref_hour_sd: 3  # Spread of preferred hours between customers, in hours.
+  hour_sd_within: 2  # Spread of session hours around a customer's preference.
+  mean_extra_recipients: 1.5  # Average extra regular recipients beyond the first one.
+  p_known_beta: [8, 2]  # Beta shape values for customer-specific regular-recipient probabilities.
+  p_self_send_beta: [1, 6]  # Beta shape values for customer-specific self-send probabilities.
+  p_recipient_other_city: 0.2  # Chance a recipient lives in another city.
+  p_late_joiner: 0.15  # Chance an account opens during the simulation.
+  bg_sessions_scale: 0.3  # Multiplier reducing background app-session rates.
+  p_device_change_per_month: 0.03  # Device-change rate setting; scaled per background session.
+  p_password_reset_per_month: 0.02  # Password-reset rate setting; scaled per background session.
+  p_legit_limit_raise_per_month: 0.03  # Limit-increase rate setting; scaled per background session.
 
-session:                       # seconds from login to voucher creation
-  habitual_median_s: 70        # experienced users are fast
-  novice_median_s: 200
-  sigma: 0.6
-  screens_mean: 3
-  p_browse: 0.12               # legit sessions where the customer browses first (balance, statements): many screens
-  browse_screens_mean: 7
-  p_multi_voucher: 0.05        # legit sessions sending to two recipients (e.g. payday: parent and sibling)
+session:  # Ordinary session duration and navigation settings.
+  habitual_median_s: 70  # Median session seconds for customers with base rate >=1/month.
+  novice_median_s: 200  # Median session seconds for lower-activity customers.
+  sigma: 0.6  # Spread of session durations; larger means more variation.
+  screens_mean: 3  # Mean screen specification; recorder emits one fewer view events.
+  p_browse: 0.12  # Chance a legitimate session includes extra browsing.
+  browse_screens_mean: 7  # Poisson setting for extra-browsing screen counts.
+  p_multi_voucher: 0.05  # Chance an ordinary session attempts a second recipient.
 
-redemption:                    # legitimate voucher redemption delay (minutes)
-  legit_median_min: 180
-  legit_sigma: 1.3
-  p_legit_fast: 0.12           # recipient waiting at ATM: 3-25 min
-  p_never_redeemed: 0.03       # voucher expires unredeemed
-  p_atm: 0.7                   # rest redeemed at retailers
+redemption:  # Ordinary legitimate redemption settings.
+  legit_median_min: 180  # Median minutes for the ordinary, non-fast delay branch.
+  legit_sigma: 1.3  # Spread of ordinary redemption delays.
+  p_legit_fast: 0.12  # Chance of the fast legitimate delay branch (3-25 minutes).
+  p_never_redeemed: 0.03  # Chance no redemption is planned for a legitimate voucher.
+  p_atm: 0.7  # Chance of ATM redemption; otherwise a retailer.
 
-legit_episodes:                # per-customer probability over the window
-  emergency: 0.04              # urgent large send, often after a limit raise
-  new_phone: 0.08              # device change then normal use
-  travel: 0.04                 # voucher redeemed in another city
+legit_episodes:  # Separate per-customer probabilities over the whole window.
+  emergency: 0.04  # Chance of an urgent, large legitimate-payment episode.
+  new_phone: 0.08  # Chance of a new-device episode followed by voucher use.
+  travel: 0.04  # Chance of a legitimate redemption in another city.
 
-scam:
-  p_targeted: 0.11             # assumption: oversampled vs reality so that ~1-2% of vouchers are scams
-  type_weights:
-    scam_classic: 0.30
-    scam_self_send: 0.20       # source: Standard Bank scam warning (victim told to send voucher to self)
-    scam_limit_raise: 0.20     # assumption based on the limit-raise step described in bank warnings
-    scam_split: 0.15
-    scam_subtle: 0.15
-  p_coached: 0.45              # scammer talks victim through the app: slow session, many screens
-  rushed_median_s: 80
-  coached_median_s: 540
-  fast_redeem_median_min: 10
-  fast_redeem_sigma: 0.6
-  slow_redeem_median_min: 60
-  p_far_redeem: 0.5            # fraudster redemption point in another metro
-  p_night: 0.08
-  p_device_change: 0.05        # vishing victims normally use their own phone
-  flags:                       # P(red flag) per scam type; no type fires every flag
-    scam_classic:     {new_recipient: 0.90, high_amount: 0.80, limit_raise: 0.30, fast_redeem: 0.85}
-    scam_self_send:   {new_recipient: 0.00, high_amount: 0.70, limit_raise: 0.30, fast_redeem: 0.85}
-    scam_limit_raise: {new_recipient: 0.80, high_amount: 0.90, limit_raise: 1.00, fast_redeem: 0.80}
-    scam_split:       {new_recipient: 0.85, high_amount: 0.00, limit_raise: 0.50, fast_redeem: 0.80}
-    scam_subtle:      {new_recipient: 0.50, high_amount: 0.00, limit_raise: 0.00, fast_redeem: 0.40}
+scam:  # Scam targeting, scenario mix and behaviour assumptions.
+  p_targeted: 0.11  # Chance a customer receives one planned scam episode.
+  type_weights:  # Assumed scenario-selection weights, not real scam frequencies.
+    scam_classic: 0.30  # Weight for classic scam episodes.
+    scam_self_send: 0.20  # Weight for self-send scams; mechanism: Standard Bank warning.
+    scam_limit_raise: 0.20  # Weight for limit-increase scam episodes.
+    scam_split: 0.15  # Weight for multiple smaller-voucher scam episodes.
+    scam_subtle: 0.15  # Weight for scams with fewer prominent warning signs.
+  p_coached: 0.45  # Chance of a longer, more navigated scam session.
+  rushed_median_s: 80  # Median seconds for the non-coached scam session.
+  coached_median_s: 540  # Median seconds for the coached scam session.
+  fast_redeem_median_min: 10  # Median minutes for the fast scam-redemption branch.
+  fast_redeem_sigma: 0.6  # Spread of fast scam-redemption delays.
+  slow_redeem_median_min: 60  # Median minutes for the slower scam-redemption branch.
+  p_far_redeem: 0.5  # Chance of planning scam redemption in another city.
+  p_night: 0.08  # Chance of the evening start-time branch (20:00-23:30).
+  p_device_change: 0.05  # Chance of a device-registration action in the scam session.
+  flags:  # Episode-level branch probabilities; observed features can differ.
+    scam_classic:
+      new_recipient: 0.9  # Chance of a new-recipient branch; otherwise self.
+      high_amount: 0.8  # Chance of sampling an amount near the assumed limit.
+      limit_raise: 0.3  # Chance of requesting the maximum daily limit.
+      fast_redeem: 0.85  # Chance of the fast-delay branch; not always under 15 minutes.
+    scam_self_send:
+      new_recipient: 0.0  # Chance of a new-recipient branch; otherwise self.
+      high_amount: 0.7  # Chance of sampling an amount near the assumed limit.
+      limit_raise: 0.3  # Chance of requesting the maximum daily limit.
+      fast_redeem: 0.85  # Chance of the fast-delay branch; not always under 15 minutes.
+    scam_limit_raise:
+      new_recipient: 0.8  # Chance of a new-recipient branch; otherwise self.
+      high_amount: 0.9  # Chance of sampling an amount near the assumed limit.
+      limit_raise: 1.0  # Chance of requesting the maximum daily limit.
+      fast_redeem: 0.8  # Chance of the fast-delay branch; not always under 15 minutes.
+    scam_split:
+      new_recipient: 0.85  # Chance of a new-recipient branch; otherwise self.
+      high_amount: 0.0  # Chance of sampling an amount near the assumed limit.
+      limit_raise: 0.5  # Chance of requesting the maximum daily limit.
+      fast_redeem: 0.8  # Chance of the fast-delay branch; not always under 15 minutes.
+    scam_subtle:
+      new_recipient: 0.5  # Chance of a new-recipient branch; otherwise self.
+      high_amount: 0.0  # Chance of sampling an amount near the assumed limit.
+      limit_raise: 0.0  # Chance of requesting the maximum daily limit.
+      fast_redeem: 0.4  # Chance of the fast-delay branch; not always under 15 minutes.
 
-metros:                        # lat, lon, population weight (approximate metro populations)
-  Johannesburg: [-26.20, 28.05, 0.28]
-  Cape Town:    [-33.92, 18.42, 0.19]
-  eThekwini:    [-29.86, 31.02, 0.16]
-  Pretoria:      [-25.75, 28.19, 0.13]
-  Ekurhuleni:   [-26.15, 28.35, 0.10]
-  NMB: [-33.96, 25.60, 0.05]
-  Mangaung:     [-29.12, 26.21, 0.04]
-  Buffalo City: [-32.98, 27.87, 0.03]
-  Polokwane:    [-23.90, 29.45, 0.02]
+metros:  # Each entry is [latitude, longitude, city-selection weight].
+  Johannesburg: [-26.20, 28.05, 0.28]  # Location and relative chance of choosing this city.
+  Cape Town:    [-33.92, 18.42, 0.19]  # Location and relative chance of choosing this city.
+  eThekwini:    [-29.86, 31.02, 0.16]  # Location and relative chance of choosing this city.
+  Pretoria:      [-25.75, 28.19, 0.13]  # Location and relative chance of choosing this city.
+  Ekurhuleni:   [-26.15, 28.35, 0.10]  # Location and relative chance of choosing this city.
+  NMB: [-33.96, 25.60, 0.05]  # Location and relative chance of choosing this city.
+  Mangaung:     [-29.12, 26.21, 0.04]  # Location and relative chance of choosing this city.
+  Buffalo City: [-32.98, 27.87, 0.03]  # Location and relative chance of choosing this city.
+  Polokwane:    [-23.90, 29.45, 0.02]  # Location and relative chance of choosing this city.

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import yaml
 from sklearn.metrics import precision_recall_curve
 
 MODEL_NAMES = ['Rules', 'Isolation Forest', 'LOF', 'One-Class SVM', 'Hybrid']
@@ -88,11 +89,16 @@ def fingerprint(root):
     root = Path(root)
     paths = ['data/synthetic/cardless_features.csv', 'config/generator.yaml',
              'src/models.py', 'src/core_evaluation.py', 'notebooks/02_fit_models.ipynb']
+    if (root / 'data/synthetic/dataset_metadata.json').exists():
+        paths.append('data/synthetic/dataset_metadata.json')
     digest = hashlib.sha256()
     for name in paths:
         digest.update(name.encode())
         path = root / name
-        if path.suffix == '.ipynb':
+        if path.suffix == '.yaml':
+            # Comments and formatting do not change the simulation settings.
+            digest.update(json.dumps(yaml.safe_load(path.read_text()), sort_keys=True).encode())
+        elif path.suffix == '.ipynb':
             nb = json.loads(path.read_text())
             content = json.dumps([(c['cell_type'], c['source']) for c in nb['cells']], sort_keys=True).encode()
             digest.update(content)
@@ -101,6 +107,37 @@ def fingerprint(root):
                 for block in iter(lambda: stream.read(1024*1024), b''):
                     digest.update(block)
     return digest.hexdigest()
+
+
+
+def feature_data_hash(root):
+    """Identify the actual feature CSV, independently of the current YAML settings."""
+    digest = hashlib.sha256()
+    with (Path(root) / 'data/synthetic/cardless_features.csv').open('rb') as stream:
+        for block in iter(lambda: stream.read(1024*1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def save_dataset_metadata(root, config):
+    """Record generation settings only immediately after generating the features."""
+    metadata = {'simulator_seed': config['seed'], 'feature_sha256': feature_data_hash(root),
+                'generation_config': config}
+    path = Path(root) / 'data/synthetic/dataset_metadata.json'
+    path.write_text(json.dumps(metadata, indent=2, sort_keys=True))
+    return metadata
+
+
+def dataset_metadata(root):
+    """Do not infer a dataset's generation seed from potentially edited settings."""
+    actual_hash = feature_data_hash(root)
+    path = Path(root) / 'data/synthetic/dataset_metadata.json'
+    if path.exists():
+        saved = json.loads(path.read_text())
+        if saved.get('feature_sha256') == actual_hash:
+            return saved
+    return {'simulator_seed': None, 'feature_sha256': actual_hash,
+            'note': 'Generation seed unknown: no matching dataset metadata.'}
 
 
 def check_fitted_bundle(bundle, root):

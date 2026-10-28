@@ -53,7 +53,7 @@ streamlit run app/dashboard.py
 pytest -q
 ```
 
-The dashboard replays saved test-period scores. It includes an alert queue, customer history and the five-model comparison, using the same selected hybrid and alert threshold as the notebooks. Rule indicators describe checklist conditions; anomaly scores and risk bands are not fraud probabilities. The date filter uses the scoring event at each stage. A ground-truth switch supports demonstration and is off by default.
+The dashboard has pages for Rules, Isolation Forest, LOF, One-Class SVM and Hybrid, plus model comparison and independent record generation. Each model can score an existing test voucher or a saved generated example. Run Simulation creates legitimate/scam activity (or a 50/50 random choice), scores it with fixed models and opens a review-alert modal when the saved threshold is crossed. Generated events and voucher features are stored separately under `data/demo/`; they never change the research history or saved test metrics. Creation and redemption remain separate scoring points. Rule indicators provide context for anomaly models, not internal model explanations. See `docs/dashboard_guide.md` for the workflow and limitations.
 
 The notebooks are the main analysis workflow. Reusable Python modules remain in `src/` for simulation, feature extraction, scoring and checks; the application remains in `app/`.
 
