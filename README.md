@@ -1,6 +1,6 @@
 # Behavioural Risk Scoring for Cardless Cash Withdrawal Fraud
 
-COS700 research project by Yeshlen Moodley, University of Pretoria. Supervised by Prof Jan Eloff.
+COS700 research project by Yeshlen Moodley.
 
 This project investigates whether customer behaviour can help identify cardless withdrawal scams. It uses synthetic banking activity to compare a Rule Based approach, Isolation Forest, LOF, One-Class SVM and a hybrid.
 
