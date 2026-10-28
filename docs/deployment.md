@@ -1,6 +1,6 @@
 # Public demonstration deployment
 
-The repository supplies the application, fixed-version dependencies and saved model bundle. Raw data is attached to the `demo-data-v1` GitHub Release as `cardless-dataset-seed42-v1.tar.gz`.
+The repository supplies the application, fixed-version dependencies and download manifests. The local `report/` folder is ignored by Git. The `demo-data-v1` GitHub Release supplies two archives: `cardless-dataset-seed42-v1.tar.gz` for raw synthetic data and `cardless-runtime-v1.tar.gz` for the saved models and model-comparison table.
 
 ## Deploy
 
@@ -11,7 +11,7 @@ The repository supplies the application, fixed-version dependencies and saved mo
 5. Deploy, then check every model page, both scoring points, record generation and the CSV download.
 6. Copy the live app URL to the README and the repository's About → Website field.
 
-The app downloads the release archive only when required data files are missing. It verifies the archive checksum and every extracted file, rejects unexpected paths, and does not overwrite existing research data. The archive contains voucher features, customers, customer habits, event history, generation metadata and voucher truth labels. It excludes old score exports and temporary demonstrations.
+The app downloads each release archive only when its required files are missing. Runtime files are restored under `report/core/` on the hosted server, without publishing the report drafts or other output files. It verifies the archive checksum and every extracted file, rejects unexpected paths, and does not overwrite existing research data. The archive contains voucher features, customers, customer habits, event history, generation metadata and voucher truth labels. It excludes old score exports and temporary demonstrations.
 
 The full dataset is used for browsing and independent generation. Fitting never runs at app startup. `dataset_metadata.json` retains the configuration that generated the original records. Restoring the current YAML seed to 42 does not rewrite the already generated data or the historical generation settings.
 
@@ -27,6 +27,7 @@ To rebuild the same archive locally:
 
 ```bash
 python scripts/package_demo_data.py --output /tmp/cardless-dataset-seed42-v1.tar.gz
+python scripts/package_demo_data.py --runtime --output /tmp/cardless-runtime-v1.tar.gz
 ```
 
 This packages existing files; it does not regenerate data. Upload a new archive only after checking that it belongs with the models being deployed.

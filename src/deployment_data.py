@@ -1,7 +1,7 @@
 """Download the published synthetic dataset when a hosted checkout has no local data."""
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import tarfile
 from tempfile import TemporaryDirectory
@@ -16,18 +16,24 @@ def file_hash(path):
     return digest.hexdigest()
 
 
-def ensure_dataset(root):
+def _ensure_release(root, manifest_name, destination):
     root = Path(root)
-    manifest = json.loads((root / 'deployment/data_release.json').read_text())
-    folder = root / 'data/synthetic'
+    manifest = json.loads((root / 'deployment' / manifest_name).read_text())
+    folder = root / destination
     files = manifest['files']
-    # Local notebook users keep their existing data and need no network connection.
-    if all((folder / name).is_file() for name in files):
+    targets = {}
+    for name, details in files.items():
+        relative = PurePosixPath(details.get('destination', name))
+        if Path(name).name != name or relative.is_absolute() or '..' in relative.parts:
+            raise ValueError('Invalid release filename.')
+        targets[name] = folder.joinpath(*relative.parts)
+    if len(set(targets.values())) != len(targets):
+        raise ValueError('Duplicate release destinations.')
+    # Local notebook users keep their existing files and need no network connection.
+    if all(path.is_file() for path in targets.values()):
         return
     for name, details in files.items():
-        if Path(name).name != name:
-            raise ValueError('Invalid dataset filename.')
-        path = folder / name
+        path = targets[name]
         if path.exists() and file_hash(path) != details['sha256']:
             raise ValueError('Existing dataset differs from the release. Use a separate clean checkout.')
     with TemporaryDirectory(prefix='cardless-data-') as temporary:
@@ -55,5 +61,15 @@ def ensure_dataset(root):
         # Validate everything before installing anything. Never overwrite local research files.
         folder.mkdir(parents=True, exist_ok=True)
         for name in files:
-            if not (folder / name).exists():
-                shutil.copyfile(unpacked / name, folder / name)
+            target = targets[name]
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(unpacked / name, target)
+
+
+def ensure_dataset(root):
+    _ensure_release(root, 'data_release.json', 'data/synthetic')
+
+
+def ensure_runtime(root):
+    _ensure_release(root, 'runtime_release.json', 'report/core')

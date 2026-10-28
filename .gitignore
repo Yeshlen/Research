@@ -9,25 +9,9 @@ data/synthetic/*.parquet
 data/synthetic/*.json
 data/seeds/
 sketch_output.csv
-# LaTeX build artefacts
-report/*.aux
-report/*.log
-report/*.bbl
-report/*.blg
-report/*.out
-report/*.toc
-report/*.synctex.gz
+# Keep generated reports, drafts, figures and model files local.
+/report/
 data/*.log
-report/latex/*.aux
-report/latex/*.log
-report/latex/*.bbl
-report/latex/*.blg
-report/latex/*.out
-report/latex/preview.pdf
-
-# Keep the deployment model bundle; ignore other local model files
-report/core/models/*
-!report/core/models/fitted_models.joblib
 
 # Separate local simulator demonstrations
 data/simulator_demo/

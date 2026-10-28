@@ -21,4 +21,4 @@ The hybrid caught more scams than rules, with more false alerts. Legitimate emer
 
 Stage A test vouchers: 83,947. Stage B: 81,208. Both contained 1,162 scam vouchers. Stage populations and separately selected thresholds differ, so these are not a controlled measurement of adding redemption features alone. No uncertainty or repeated-seed experiments are included in the revised evaluation.
 
-Full settings and software versions: `report/core/run_metadata.json`. The saved fitted-model bundle is included in Git for deployment; regenerate it with notebook 02 when fitting inputs change. The dashboard uses notebook 03's scores and fixed thresholds.
+Full settings and software versions: `report/core/run_metadata.json`. The saved fitted-model bundle is supplied through the GitHub Release for deployment; regenerate it with notebook 02 when fitting inputs change. The dashboard shows notebook 03's fixed test metrics and scores selected vouchers using the saved models and validation thresholds.

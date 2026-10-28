@@ -1,9 +1,0 @@
-feature,Legitimate median,Legitimate IQR,Scam median,Scam IQR
-amount,600.0,400.0-1000.0,1800.0,900.0-3100.0
-amount_ratio_to_avg_90d,1.0,0.7-1.2,1.765,1.0-3.8
-amount_to_limit_ratio,0.2,0.1-0.3,0.48,0.3-0.8
-history_count,8.0,3.0-18.0,3.0,1.0-7.0
-secs_since_login,98.7,57.8-183.6,217.1,90.2-515.8
-screens_before_create,2.0,1.0-3.0,2.0,1.0-9.0
-redeem_delay_min,142.84,45.6-375.1,12.44,7.5-23.8
-redeem_dist_usual_km,19.3,7.3-169.0,111.8,21.5-539.3

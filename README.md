@@ -23,7 +23,7 @@ pip install -r requirements.txt
 jupyter lab
 ```
 
-Notebook 01 reuses an existing dataset. Set its `REGENERATE` flag only when rebuilding the simulator data. Synthetic data files are excluded from Git. The saved fitted-model bundle is included for deployment; run the preceding notebooks when rebuilding data or models. Outputs are saved under `report/core/`, with fitted models in `report/core/models/`.
+Notebook 01 reuses an existing dataset. Set its `REGENERATE` flag only when rebuilding the simulator data. Synthetic data files are excluded from Git. The saved fitted-model bundle is supplied through the GitHub Release for deployment; run the preceding notebooks when rebuilding data or models. Outputs are saved under `report/core/`, with fitted models in `report/core/models/`.
 
 ## Dataset simulator
 
@@ -61,13 +61,13 @@ The notebooks are the main analysis workflow. Reusable Python modules remain in 
 
 ## Earlier analyses
 
-Original extended evaluation scripts and documentation are preserved under `archive/extended_evaluation/`. Figures/tables outside `report/core/` and earlier LaTeX report fragments describe the older experiment. They are historical, not outputs of the revised five-approach evaluation. See `docs/eda_findings.md` and `docs/model_results.md` for the new run.
+Original extended evaluation scripts and documentation are preserved under `archive/extended_evaluation/`. Locally, figures/tables outside `report/core/` and earlier LaTeX report fragments describe the older experiment. They are historical, not outputs of the revised five-approach evaluation. See `docs/eda_findings.md` and `docs/model_results.md` for the new run.
 
 ## Streamlit Community Cloud
 
 Use repository `Yeshlen/Research`, branch `main`, entry point `app/dashboard.py`, and Python **3.14** in Advanced settings. `requirements.txt` pins the versions used by the saved models. No API keys or paid services are needed for the public demo.
 
-When the required files are absent, the app downloads the original synthetic dataset from the `demo-data-v1` GitHub Release. `deployment/data_release.json` records the download URL and archive/file checksums. The repository and release must be public for anonymous Community Cloud downloads. Existing local data is reused without downloading or overwriting it. The bundled dataset and existing reported metrics are unchanged.
+When the required files are absent, the app downloads the original synthetic dataset, saved models and model-comparison table from the `demo-data-v1` GitHub Release. `deployment/data_release.json` and `deployment/runtime_release.json` record download URLs and checksums. The `report/` folder is local and ignored by Git; the hosted app restores only its required model bundle and results table. The repository and release must be public for anonymous Community Cloud downloads. Existing local data is reused without downloading or overwriting it. The bundled dataset and existing reported metrics are unchanged.
 
 Generated examples stay in each visitor's session. Download the CSV before leaving to retain them. The app does not save visitors' generations to shared server CSVs. Community Cloud may sleep after inactivity, and the first visit may take longer while the app starts or downloads data.
 

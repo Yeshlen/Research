@@ -76,3 +76,21 @@ def test_generated_examples_belong_only_to_one_visitor():
     assert session_examples(first).iloc[0].amount == 100
     with pytest.raises(ValueError, match='already been saved'):
         remember_example(first, pd.DataFrame({'voucher_id': [10]}))
+
+
+def test_runtime_release_restores_nested_report_files(tmp_path):
+    from deployment_data import ensure_runtime
+    root, _, manifest, payload = release(tmp_path)
+    manifest['files']['customers.csv']['destination'] = 'tables/model_comparison.csv'
+    (root / 'deployment/runtime_release.json').write_text(json.dumps(manifest))
+    ensure_runtime(root)
+    assert (root / 'report/core/tables/model_comparison.csv').read_bytes() == payload
+
+
+def test_release_destination_cannot_escape_its_folder(tmp_path):
+    root, _, manifest, _ = release(tmp_path)
+    manifest['files']['customers.csv']['destination'] = '../escaped.csv'
+    (root / 'deployment/data_release.json').write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match='Invalid release filename'):
+        ensure_dataset(root)
+    assert not (root / 'data/escaped.csv').exists()

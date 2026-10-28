@@ -1,0 +1,16 @@
+{
+  "url": "https://github.com/Yeshlen/Research/releases/download/demo-data-v1/cardless-runtime-v1.tar.gz",
+  "sha256": "f1f28030dea6b77e685e2944dffbfc3710eb380229458ffc141bcef9d8ac6762",
+  "files": {
+    "fitted_models.joblib": {
+      "sha256": "0a8395aca2f13e837fd961a323bb1222260899317b6574778e09953d106a54ae",
+      "bytes": 51735150,
+      "destination": "models/fitted_models.joblib"
+    },
+    "model_comparison.csv": {
+      "sha256": "cdeb035495f32abb462c7b4de04cc4257f64793ceaf552ff44cecefdfba6d264",
+      "bytes": 1341,
+      "destination": "tables/model_comparison.csv"
+    }
+  }
+}

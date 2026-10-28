@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from core_evaluation import fingerprint, load_data, split_stage
 from demo_scoring import score_vouchers
-from deployment_data import ensure_dataset
+from deployment_data import ensure_dataset, ensure_runtime
 from session_examples import session_examples
 from models import STAGE_A_FEATURES, STAGE_B_FEATURES
 
@@ -55,6 +55,7 @@ def _load_resources(signatures):
 @st.cache_resource
 def _prepare_dataset():
     ensure_dataset(ROOT)
+    ensure_runtime(ROOT)
 
 
 def load_resources():
