@@ -2,6 +2,8 @@
 
 University of Pretoria COS700 research project (supervisor: Prof Jan Eloff).
 
+**[Try the live demo](https://research-pv84owqnaakhuavatpfysb.streamlit.app/)** — explore the models, score vouchers and generate new examples.
+
 A prototype that simulates mobile banking events, extracts behavioural features and scores cardless withdrawal vouchers for possible social-engineering scams.
 
 ## Setup and notebook workflow
