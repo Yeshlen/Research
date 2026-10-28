@@ -27,7 +27,7 @@ Notebook 01 reuses an existing dataset. Set its `REGENERATE` flag only when rebu
 
 ## Dataset simulator
 
-The active entry point is `src/simulate.py`. Its generation stages are in `src/simulator/`: customer profiles, ordinary activity, special scenarios, event recording and CSV output. Start with `src/simulator/run.py` and `docs/simulator_guide.md` to follow the process. Historical implementations are retained locally and are not needed to run this repository.
+The active entry point is `src/simulate.py`. Its generation stages are in `src/simulator/`: customer profiles, ordinary activity, special scenarios, event recording and CSV output. Start with `src/simulator/run.py` to follow the process. Historical implementations are retained locally and are not needed to run this repository.
 
 For a small example in a separate folder:
 
@@ -44,7 +44,7 @@ Exactly five approaches at voucher creation and redemption: rules, Isolation For
 
 Results report precision, recall, F1, false positive rate, underlying decision counts and scenario rates. The anomaly models fit without labels, but validation selection uses scam labels. The data is synthetic and was already examined during development.
 
-Full procedure: `docs/core_workflow.md`. Configuration: `config/generator.yaml`. Feature definitions and simulator assumptions: `docs/data_dictionary.md` and `docs/dataset_design.md`.
+Simulation settings are in `config/generator.yaml`. Feature calculations are in `src/features.py`; model inputs and rules are in `src/models.py`.
 
 ## Dashboard and checks
 
@@ -55,7 +55,7 @@ streamlit run app/dashboard.py
 pytest -q
 ```
 
-The dashboard has pages for Rule Based, Isolation Forest, LOF, One-Class SVM and Hybrid, plus model comparison and independent record generation. Each model can score an existing test voucher or a generated example from their session. The outline dice button chooses a random test record from the current filter. Generate Record creates legitimate/scam activity (or a 50/50 random choice), scores it with fixed models and opens a review-alert modal when the saved threshold is crossed. Generated examples stay within each visitor's session and can be downloaded as CSV; they never change the research history or saved test metrics. Creation and redemption remain separate scoring points. Rule indicators provide context for anomaly models, not internal model explanations. See `docs/dashboard_guide.md` for the workflow and limitations.
+The dashboard has pages for Rule Based, Isolation Forest, LOF, One-Class SVM and Hybrid, plus model comparison and independent record generation. Each model can score an existing test voucher or a generated example from their session. The outline dice button chooses a random test record from the current filter. Generate Record creates legitimate/scam activity (or a 50/50 random choice), scores it with fixed models and opens a review-alert modal when the saved threshold is crossed. Generated examples stay within each visitor's session and can be downloaded as CSV; they never change the research history or saved test metrics. Creation and redemption remain separate scoring points. Rule indicators provide context for anomaly models, not internal model explanations.
 
 The notebooks are the main analysis workflow. Reusable Python modules remain in `src/` for simulation, feature extraction, scoring and checks; the application remains in `app/`.
 
@@ -67,4 +67,3 @@ When the required files are absent, the app downloads the original synthetic dat
 
 Generated examples stay in each visitor's session. Download the CSV before leaving to retain them. The app does not save visitors' generations to shared server CSVs. Community Cloud may sleep after inactivity, and the first visit may take longer while the app starts or downloads data.
 
-Deployment details: `docs/deployment.md`.
