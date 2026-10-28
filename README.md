@@ -21,7 +21,7 @@ pip install -r requirements.txt
 jupyter lab
 ```
 
-Notebook 01 reuses an existing dataset. Set its `REGENERATE` flag only when rebuilding the simulator data. Data files and fitted-model binaries are excluded from Git; if either is absent, run the preceding notebooks. Outputs are saved under `report/core/`, with fitted models in `report/core/models/`.
+Notebook 01 reuses an existing dataset. Set its `REGENERATE` flag only when rebuilding the simulator data. Synthetic data files are excluded from Git. The saved fitted-model bundle is included for deployment; run the preceding notebooks when rebuilding data or models. Outputs are saved under `report/core/`, with fitted models in `report/core/models/`.
 
 ## Dataset simulator
 
