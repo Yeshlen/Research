@@ -1,3 +1,3 @@
 # Historical material
 
-The earlier `validation_v1.txt` is preserved in `archive/extended_evaluation/docs/validation_v1.txt`. Use `docs/core_workflow.md` for the revised notebook evaluation.
+Earlier extended-evaluation material is retained locally and is not included in Git. Use `docs/core_workflow.md` for the current notebook evaluation.

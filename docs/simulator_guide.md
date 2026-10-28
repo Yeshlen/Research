@@ -1,6 +1,6 @@
 # Simulator guide
 
-The original single-file implementation is preserved at `archived/simulate.py`. The active entry point is `src/simulate.py`, which calls the `src/simulator/` package. Notebook 01 uses the same package.
+The original single-file implementation is retained locally at `archived/simulate.py` (not included in Git). The active entry point is `src/simulate.py`, which calls the `src/simulator/` package. Notebook 01 uses the same package.
 
 ## Start with the process
 

@@ -6,7 +6,7 @@ From the repository root:
 Then calculate the features:
     python src/features.py --data data/simulator_demo
 
-The original single-file version is preserved in archived/simulate.py.
+The original single-file version is retained locally in archived/simulate.py (not included in Git).
 Read simulator/run.py for the generation sequence.
 """
 import argparse

@@ -1,6 +1,6 @@
 # Simulator verification
 
-The rewrite preserves the original single-file simulator at `archived/simulate.py` and the existing generated dataset.
+The rewrite retains a local copy of the original simulator at `archived/simulate.py` (not included in Git) and the existing generated dataset.
 
 - Final repository test suite: **26 passed** (including the seed-75 regression case).
 - New regression tests compare all four CSVs byte for byte for 800 customers under seeds 42, 7, 123 and 75, using small batches to exercise batch boundaries. They also compare the extracted feature DataFrames, run all 20 data checks and confirm all scam categories occur.

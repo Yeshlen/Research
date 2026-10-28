@@ -33,4 +33,4 @@ When notebook 01 generates data, it records the generation seed, configuration a
 
 ## Earlier work
 
-`archive/extended_evaluation/` preserves the former Python evaluation entry points and their notes. Earlier plots and tables outside `report/core/` are historical and must not be combined with the revised results. Autoencoder, supervised benchmark, bootstrap, learning curves and sensitivity/ablation experiments are excluded from this workflow.
+The former evaluation entry points and notes are retained locally, outside Git tracking. Earlier plots and tables outside `report/core/` are historical and must not be combined with the revised results. Autoencoder, supervised benchmark, bootstrap, learning curves and sensitivity/ablation experiments are excluded from this workflow.

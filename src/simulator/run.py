@@ -13,7 +13,7 @@ from .helpers import EVENT_COLUMNS
 
 
 def generate_dataset(config, output_folder, chunk_size=2000):
-    """Use the same random process and CSV format as the original archived/simulate.py.
+    """Use the same random process and CSV format as the original simulator retained locally in archived/simulate.py.
 
     Batches limit memory use. The feature CSV is created separately by features.py.
     Random calls stay in their original order so seeded runs can be compared.

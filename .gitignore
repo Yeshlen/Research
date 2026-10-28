@@ -18,3 +18,7 @@ data/simulator_demo/
 data/simulator_full/
 # Independent dashboard examples (not research or evaluation data)
 data/demo/
+
+# Historical implementations and analyses retained only locally
+/archive/
+/archived/
