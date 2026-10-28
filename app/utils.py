@@ -183,9 +183,6 @@ def alert_dialog(decisions):
             st.write(f"- {reason}")
         if not decision["reasons"]:
             st.write("No checklist rules triggered; the anomaly score crossed the threshold.")
-    if any(d["model"] != "Rules" for d in decisions):
-        st.caption("Checklist indicators provide context; they are not feature attributions for an anomaly model.")
-    st.caption("This is a review alert, not confirmation of fraud. No payment is blocked.")
     if st.button("Close", key="close_alert"):
         st.rerun()
 
