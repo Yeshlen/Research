@@ -22,3 +22,13 @@ data/demo/
 # Historical implementations and analyses retained only locally
 /archive/
 /archived/
+
+# Local source documents, historical notes and redundant placeholders
+/inputs/
+/docs/robustness.md
+/docs/report_data_section_plan.md
+/docs/validation_v1.txt
+/docs/simulator_verification.md
+/docs/simulator_full_comparison.json
+/notebooks/.gitkeep
+/tests/.gitkeep

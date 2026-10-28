@@ -1,6 +1,6 @@
 # Dataset Design: Draft for Discussion
 
-Status: draft v1. Based on `cos700_full_chat_summary.md`, the submitted proposal (`inputs/COS700_proposal.pdf`) and the report guide (`inputs/Research_Report_slides.pptx`). Section 10 lists where this design matches or deviates from the proposal.
+Design notes based on the submitted proposal and course report guidance. Section 10 lists where this design matches or deviates from the proposal.
 
 ---
 

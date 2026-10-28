@@ -107,8 +107,8 @@ This is a readability rewrite, not a redesigned experiment. Random draws occur i
 
 Other original conventions also remain: screen specifications produce one fewer view event; scam redemption planning has no explicit expiry-discard branch; the CSV's legacy `split` column is still added by the unchanged extractor. Any later change to these would be a separate change to the experiment.
 
-The new regression tests compare all four CSVs byte for byte, then compare extracted features and run all 20 consistency checks. See `simulator_verification.md` for the actual verification results.
+The tests run all 20 dataset consistency checks across several seeds. When the original simulator is available locally, they also compare all four generated CSVs byte for byte and compare the extracted features.
 
 ## Current configuration and saved results
 
-The current configuration uses seed 75 and city labels Pretoria and NMB, as requested by the researcher. Previously saved evaluation results refer to the existing seed-42 dataset. Changing the YAML does not regenerate those files; regeneration and model refitting are separate operations. The full-file reproduction check documented here used the earlier seed-42 configuration and its original city names.
+The current configuration uses seed 42. The existing dataset also records its original generation settings in `dataset_metadata.json`, including the city labels used for those records. Changing the YAML does not regenerate existing files; regeneration and model refitting are separate operations.
