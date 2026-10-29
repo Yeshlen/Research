@@ -2,7 +2,7 @@
 
 COS700 research project by Yeshlen Moodley.
 
-This project investigates whether customer behaviour can help identify cardless withdrawal scams. It uses synthetic banking activity to compare a Rule Based approach, Isolation Forest, LOF, One-Class SVM and a hybrid.
+This project investigates whether customer behaviour can help identify cardless withdrawal scams. It uses synthetic banking activity to compare a Rule Based approach, Isolation Forest, LOF, One-Class SVM and a hybrid modelled using both the Rule Base and One Class SVM approaches.
 
 ## Live demo
 
